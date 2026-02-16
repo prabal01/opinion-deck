@@ -1,0 +1,4 @@
+- Currently the animation when anlyzing report is basic button animation. I want a component for it.
+- Currently, there is no way of knowing how many tokens I have and how many is used.
+- All the reports should be available at one seprate place also.
+- I want a sidebar where I will be adding more tools 

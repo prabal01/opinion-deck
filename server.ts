@@ -1,3 +1,4 @@
+
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -24,32 +25,50 @@ import { rateLimiterMiddleware } from "./server/middleware/rateLimiter.js";
 import { initPayments, createCheckoutUrl } from "./server/stripe.js";
 import {
     getFolders,
+    getFolder,
     createFolder,
     deleteFolder,
     saveThreadToFolder,
-    getThreadsInFolder
+    getThreadsInFolder,
+    saveAnalysis,
+    getLatestAnalysis
 } from "./server/firestore.js";
+import { analyzeThreads } from "./server/ai.js";
 
 // ── Init ───────────────────────────────────────────────────────────
 
 const app = express();
 const PORT = parseInt(process.env.PORT || "3001", 10);
-const USER_AGENT = "reddit-dl/1.0.0";
-const TOOL_VERSION = "1.0.0";
+const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+const TOOL_VERSION = "1.0.1";
 const RATE_LIMIT_DELAY = 1000;
 
 // Initialize Firebase & Payments (non-blocking — app works without them)
+console.log("Initializing Firebase...");
 initFirebase();
+console.log("Initializing Payments...");
 initPayments();
+
+process.on("unhandledRejection", (reason, promise) => {
+    console.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+    console.error("Uncaught Exception:", err);
+});
 
 // ── Request Queue (max 20 concurrent Reddit fetches) ───────────────
 
 const fetchQueue = new PQueue({ concurrency: 20, timeout: 30_000 });
 
+// ── Analysis Queue (max 5 concurrent AI jobs) ─────────────────────
+
+const analysisQueue = new PQueue({ concurrency: 5, timeout: 60_000 });
+
 // ── Middleware ──────────────────────────────────────────────────────
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increased limit for large threads
 app.use(authMiddleware);
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -61,12 +80,15 @@ function sleep(ms: number): Promise<void> {
 async function fetchWithRetry(url: string, maxRetries = 3): Promise<any> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
+            console.log(`[Fetch] Attempt ${attempt}/${maxRetries}: ${url}`);
             const response = await fetch(url, {
                 headers: {
                     "User-Agent": USER_AGENT,
                     Accept: "application/json",
                 },
             });
+
+            console.log(`[Fetch] Status: ${response.status} ${response.statusText}`);
 
             if (response.status === 429) {
                 const retryAfter = parseInt(response.headers.get("retry-after") || "5");
@@ -85,6 +107,7 @@ async function fetchWithRetry(url: string, maxRetries = 3): Promise<any> {
 
             return await response.json();
         } catch (error: any) {
+            console.error(`[Fetch] Error on attempt ${attempt}:`, error.message);
             if (attempt === maxRetries) {
                 throw new Error(`Failed after ${maxRetries} attempts: ${error.message}`);
             }
@@ -169,7 +192,9 @@ app.post("/api/fetch", rateLimiterMiddleware, async (req, res) => {
             return;
         }
 
-        const config = await getEffectiveConfig(req);
+        // Allow public access for demo, but ensure rate limits
+        // The rateLimiterMiddleware already prevents abuse
+        const config = req.user ? await getEffectiveConfig(req) : await getPlanConfig("free");
 
         const result = await fetchQueue.add(async () => {
             const urlInfo = parseRedditUrl(url);
@@ -269,21 +294,26 @@ app.post("/api/fetch", rateLimiterMiddleware, async (req, res) => {
 // ── User Plan endpoint ─────────────────────────────────────────────
 
 app.get("/api/user/plan", async (req, res) => {
-    if (!req.user) {
-        const freeConfig = await getPlanConfig("free");
-        res.json({
-            plan: "free",
-            authenticated: false,
-            config: freeConfig,
-        });
-        return;
-    }
+    try {
+        if (!req.user) {
+            const freeConfig = await getPlanConfig("free");
+            res.json({
+                plan: "free",
+                authenticated: false,
+                config: freeConfig,
+            });
+            return;
+        }
 
-    res.json({
-        plan: req.user.plan,
-        authenticated: true,
-        config: req.user.config,
-    });
+        res.json({
+            plan: req.user.plan,
+            authenticated: true,
+            config: req.user.config,
+        });
+    } catch (err: any) {
+        console.error("GET /api/user/plan - Fatal Error:", err);
+        res.status(500).json({ error: err.message, stack: err.stack });
+    }
 });
 
 // ── Upgrade (stub — no payment provider yet) ───────────────────────
@@ -308,19 +338,24 @@ app.post("/api/create-checkout-session", async (req, res) => {
 // ── Folder Routes ──────────────────────────────────────────────────
 
 app.get("/api/folders", async (req, res) => {
+    console.log("GET /api/folders - Request received", { user: req.user?.uid });
     if (!req.user) {
+        console.warn("GET /api/folders - Unauthorized");
         res.status(401).json({ error: "Unauthorized" });
         return;
     }
     try {
         const folders = await getFolders(req.user.uid);
+        console.log(`GET /api/folders - Found ${folders.length} folders`);
         res.json(folders);
     } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        console.error("GET /api/folders - Error:", err);
+        res.status(500).json({ error: err.message, stack: err.stack });
     }
 });
 
 app.post("/api/folders", async (req, res) => {
+    // console.log("POST /api/folders - Request received", { user: req.user?.uid, body: req.body });
     if (!req.user) {
         res.status(401).json({ error: "Unauthorized" });
         return;
@@ -334,6 +369,7 @@ app.post("/api/folders", async (req, res) => {
         const folder = await createFolder(req.user.uid, name, description);
         res.json(folder);
     } catch (err: any) {
+        console.error("POST /api/folders - Error:", err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -384,6 +420,80 @@ app.get("/api/folders/:id/threads", async (req, res) => {
     }
 });
 
+// ── AI Analysis Route ─────────────────────────────────────────────
+
+app.post("/api/folders/:id/analyze", async (req, res) => {
+    if (!req.user) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
+
+    try {
+        // 1. Fetch folder details for context
+        const folder = await getFolder(req.user.uid, req.params.id);
+        const folderContext = folder?.description || "";
+
+        // 2. Fetch all threads in folder
+        const savedThreads = await getThreadsInFolder(req.user.uid, req.params.id);
+
+        if (savedThreads.length === 0) {
+            res.status(400).json({ error: "Folder is empty" });
+            return;
+        }
+
+        // 3. Add to Analysis Queue
+        const analysisResult = await analysisQueue.add(async () => {
+            console.log(`[AI] Starting analysis for folder ${req.params.id} (${savedThreads.length} threads)`);
+
+            // Map to simplified context for AI
+            const threadsContext = savedThreads.map(t => ({
+                id: t.id,
+                title: t.title,
+                subreddit: t.subreddit,
+                comments: t.data.comments // Full comment tree
+            }));
+
+            return await analyzeThreads(threadsContext, folderContext);
+        });
+
+        // 3. Save & Return
+        const parsedResult = JSON.parse(analysisResult);
+
+        // Save to Firestore (Fire & Forget)
+        saveAnalysis(req.user.uid, req.params.id, parsedResult, "gemini-flash-latest");
+
+        res.json(parsedResult);
+
+    } catch (err: any) {
+        console.error("Analysis Error:", err);
+        if (err.message?.includes("GEMINI_API_KEY")) {
+            res.status(500).json({ error: "AI Service not configured (missing key)" });
+        } else if (err.message?.includes("timed out")) {
+            res.status(503).json({ error: "Analysis timed out. Try analyzing fewer threads." });
+        } else {
+            res.status(500).json({ error: "Analysis failed: " + err.message });
+        }
+    }
+});
+
+app.get("/api/folders/:id/analysis", async (req, res) => {
+    if (!req.user) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
+    try {
+        const analysis = await getLatestAnalysis(req.user.uid, req.params.id);
+        if (!analysis) {
+            res.status(404).json({ error: "No analysis found" });
+            return;
+        }
+        res.json(analysis.data);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 // ── Health Check ───────────────────────────────────────────────────
 
 app.get("/api/health", (_req, res) => {
@@ -392,12 +502,21 @@ app.get("/api/health", (_req, res) => {
         version: TOOL_VERSION,
         queueSize: fetchQueue.size,
         queuePending: fetchQueue.pending,
+        analysisQueueSize: analysisQueue.size,
+        analysisQueuePending: analysisQueue.pending,
     });
+});
+
+// ── Error Handler ─────────────────────────────────────────────────
+
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error("GLOBAL ERROR HANDLER:", err);
+    res.status(500).json({ error: err.message || "Internal Server Error" });
 });
 
 // ── Start ──────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
     console.log(`🚀 Reddit proxy server running on http://localhost:${PORT}`);
-    console.log(`   Queue concurrency: 20 | Timeout: 30s`);
+    console.log(`   Fetch Queue: 20 concurrent | Analysis Queue: 5 concurrent`);
 });

@@ -4,7 +4,6 @@ import type {
     RedditPostData,
     RedditCommentData,
     RedditMoreData,
-    Post,
     Comment,
     ThreadData,
     RedditUrlInfo,
@@ -112,7 +111,7 @@ export async function fetchThread(
     const commentListing = data[1] as RedditThing<
         RedditListing<RedditCommentData | RedditMoreData>
     >;
-    const { comments, moreIds, linkId } =
+    const { comments, moreIds, linkId: _linkId } =
         extractCommentsFromListing(commentListing);
 
     const postFullname = rawPost.name; // e.g., t3_abc123

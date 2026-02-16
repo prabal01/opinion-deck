@@ -25,6 +25,7 @@ export function CommentNode({ comment, postAuthor }: CommentNodeProps) {
 
     return (
         <div
+            id={comment.id}
             className={`comment-node depth-${Math.min(comment.depth, 8)}`}
             role="article"
             aria-label={`Comment by ${comment.author}`}

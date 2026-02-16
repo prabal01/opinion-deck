@@ -5,10 +5,9 @@ import { createCheckoutSession } from "../lib/api";
 interface UpgradePromptProps {
     totalComments: number;
     commentsShown: number;
-    commentLimit: number;
 }
 
-export function UpgradePrompt({ totalComments, commentsShown, commentLimit }: UpgradePromptProps) {
+export function UpgradePrompt({ totalComments, commentsShown }: UpgradePromptProps) {
     const { user, signInWithGoogle } = useAuth();
     const [upgrading, setUpgrading] = useState(false);
     const [dismissed, setDismissed] = useState(false);

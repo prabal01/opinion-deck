@@ -1,36 +1,33 @@
 export function SEOContent() {
     return (
         <div className="seo-content">
-            <section className="seo-section">
+            <section className="features-intro">
                 <h3>Why Reddit Keeper?</h3>
-                <p>
-                    Reddit is home to the most authentic human conversations on the internet.
-                    Whether you're an AI researcher, a writer, or a data analyst, getting that
-                    data in a structured, clean format is essential. **Reddit Keeper** makes this
-                    process instant and seamless.
+                <p className="features-subtitle">
+                    The most authentic human conversations on the internet, now structured for AI, research, and archives.
                 </p>
             </section>
 
             <section className="seo-section grid">
                 <div className="benefit-card">
-                    <h4>🤖 AI-Ready Context</h4>
+                    <div className="benefit-icon">🤖</div>
+                    <h4>AI-Ready Context</h4>
                     <p>
-                        Large Language Models (LLMs) thrive on structured data. Export threads including all
-                        replies, scores, and metadata to Markdown or JSON to give your AI models the perfect context.
+                        Export threads with full hierarchy and metadata. Perfect for fine-tuning LLMs or building RAG pipelines.
                     </p>
                 </div>
                 <div className="benefit-card">
-                    <h4>📊 Research & Analysis</h4>
+                    <div className="benefit-icon">📊</div>
+                    <h4>Deep Analysis</h4>
                     <p>
-                        Analyze sentiment, community trends, and public discourse. Our exports preserve the
-                        exact thread hierarchy, making it easy to parse for academic or commercial research.
+                        Analyze sentiment, trends, and discourse patterns. We preserve the exact structure of global conversations.
                     </p>
                 </div>
                 <div className="benefit-card">
-                    <h4>📁 Offline Archives</h4>
+                    <div className="benefit-icon">💾</div>
+                    <h4>Offline Archives</h4>
                     <p>
-                        Never lose a valuable conversation again. Keep personal backups of legendary AMA threads,
-                        tutorials, and technical discussions in a human-readable format.
+                        Never lose a legendary thread. Keep local backups of tutorials, AMAs, and discussions in Markdown or JSON.
                     </p>
                 </div>
             </section>

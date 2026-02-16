@@ -103,7 +103,7 @@ export function extractCommentsFromListing(
  * Build a hierarchical comment tree from a flat list of comments
  * (used when processing /api/morechildren responses)
  */
-export function buildTreeFromFlat(flatComments: Comment[], rootParentId: string): Comment[] {
+export function buildTreeFromFlat(flatComments: Comment[], _rootParentId: string): Comment[] {
     const byId = new Map<string, Comment>();
     const roots: Comment[] = [];
 

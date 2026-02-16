@@ -264,9 +264,10 @@ export async function getFolders(uid: string): Promise<Folder[]> {
     try {
         const snapshot = await db.collection("folders")
             .where("uid", "==", uid)
-            .orderBy("createdAt", "desc")
             .get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Folder));
+        return snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as Folder))
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } catch (err) {
         console.error("Failed to get folders:", err);
         return [];
@@ -274,19 +275,39 @@ export async function getFolders(uid: string): Promise<Folder[]> {
 }
 
 export async function createFolder(uid: string, name: string, description?: string): Promise<Folder> {
-    if (!db) throw new Error("Database not initialized");
+    if (!db) {
+        // Mock folder for local dev without Firestore
+        return {
+            id: `mock_folder_${Date.now()}`,
+            uid,
+            name,
+            description,
+            color: "#6366f1",
+            createdAt: new Date().toISOString(),
+            threadCount: 0,
+        };
+    }
     const ref = db.collection("folders").doc();
     const folder: Folder = {
         id: ref.id,
         uid,
         name,
-        description,
         color: "#6366f1", // Default indigo
         createdAt: new Date().toISOString(),
         threadCount: 0,
+        ...(description ? { description } : {}),
     };
     await ref.set(folder);
     return folder;
+}
+
+export async function getFolder(uid: string, folderId: string): Promise<Folder | null> {
+    if (!db) return null;
+    const doc = await db.collection("folders").doc(folderId).get();
+    if (doc.exists && doc.data()?.uid === uid) {
+        return doc.data() as Folder;
+    }
+    return null;
 }
 
 export async function deleteFolder(uid: string, folderId: string): Promise<void> {
@@ -309,7 +330,10 @@ export async function deleteFolder(uid: string, folderId: string): Promise<void>
 // ── Saved Threads Management ───────────────────────────────────────
 
 export async function saveThreadToFolder(uid: string, folderId: string, threadData: any): Promise<void> {
-    if (!db) throw new Error("Database not initialized");
+    if (!db) {
+        console.log(`[MOCK] Save thread ${threadData.post.id} to folder ${folderId}`);
+        return;
+    }
 
     const folderRef = db.collection("folders").doc(folderId);
     const folderDoc = await folderRef.get();
@@ -350,12 +374,75 @@ export async function getThreadsInFolder(uid: string, folderId: string): Promise
         const snapshot = await db.collection("saved_threads")
             .where("uid", "==", uid)
             .where("folderId", "==", folderId)
-            .orderBy("savedAt", "desc")
             .get();
-        return snapshot.docs.map(doc => doc.data() as SavedThread);
+        return snapshot.docs
+            .map(doc => doc.data() as SavedThread)
+            .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
     } catch (err) {
         console.error("Failed to get threads:", err);
         return [];
+    }
+}
+
+// ── Analysis Persistence ───────────────────────────────────────────
+
+export interface AnalysisDoc {
+    id: string;
+    folderId: string;
+    uid: string;
+    data: any;
+    model: string;
+    createdAt: string;
+}
+
+export async function saveAnalysis(uid: string, folderId: string, data: any, modelName: string): Promise<void> {
+    if (!db) {
+        console.error("[FIRESTORE] DB not initialized. Cannot save analysis.");
+        return;
+    }
+    try {
+        console.log(`[FIRESTORE] Saving analysis for folder ${folderId} (User: ${uid})`);
+        const res = await db.collection("folder_analyses").add({
+            folderId,
+            uid,
+            data,
+            model: modelName,
+            createdAt: new Date().toISOString()
+        });
+        console.log(`[FIRESTORE] Analysis saved with ID: ${res.id}`);
+    } catch (err) {
+        console.error("Failed to save analysis:", err);
+    }
+}
+
+export async function getLatestAnalysis(uid: string, folderId: string): Promise<AnalysisDoc | null> {
+    if (!db) {
+        console.warn("[FIRESTORE] DB not initialized. Cannot fetch analysis.");
+        return null;
+    }
+    try {
+        console.log(`[FIRESTORE] Fetching latest analysis for folder ${folderId}`);
+        // Removed orderBy to avoid requiring a composite index
+        const snapshot = await db.collection("folder_analyses")
+            .where("uid", "==", uid)
+            .where("folderId", "==", folderId)
+            .get();
+
+        if (snapshot.empty) {
+            console.log("[FIRESTORE] No analysis found.");
+            return null;
+        }
+
+        // Sort in memory (descending by createdAt)
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AnalysisDoc));
+        docs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        const doc = docs[0];
+        console.log(`[FIRESTORE] Found analysis: ${doc.id}`);
+        return doc;
+    } catch (err) {
+        console.error("Failed to get analysis:", err);
+        return null;
     }
 }
 

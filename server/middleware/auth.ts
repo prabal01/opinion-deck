@@ -44,6 +44,13 @@ export async function authMiddleware(
     const adminAuth = getAdminAuth();
 
     if (!adminAuth) {
+        // Mock user for local dev without Firestore/Auth
+        req.user = {
+            uid: "mock-user-123",
+            email: "mock@local.dev",
+            plan: "pro",
+            config: await getPlanConfig("pro"),
+        };
         return next();
     }
 

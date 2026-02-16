@@ -81,7 +81,7 @@ export function PricingPage() {
                         <span className="plan-emoji" aria-hidden="true">⚡</span>
                         <h3 className="plan-name">Pro</h3>
                         <div className="plan-price">
-                            <span className="price-amount">$5</span>
+                            <span className="price-amount">$29</span>
                             <span className="price-period">/ month</span>
                         </div>
                     </div>
@@ -106,7 +106,7 @@ export function PricingPage() {
                             className="plan-cta pro-cta"
                             onClick={handleUpgrade}
                             disabled={upgrading}
-                            aria-label="Upgrade to Reddit Keeper Pro for $5 per month"
+                            aria-label="Upgrade to Reddit Keeper Pro for $29 per month"
                         >
                             {upgrading ? "Redirecting..." : "Upgrade to Pro →"}
                         </button>

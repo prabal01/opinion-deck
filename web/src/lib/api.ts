@@ -118,3 +118,22 @@ export async function createPortalSession(): Promise<string> {
     const data = await response.json();
     return data.url;
 }
+
+// ── Fetch Folder Analysis ──────────────────────────────────────────
+
+export async function fetchFolderAnalysis(folderId: string): Promise<any | null> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`/api/folders/${folderId}/analysis`, {
+        method: "GET",
+        headers,
+    });
+
+    if (response.status === 404) return null;
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || `Failed to fetch analysis: ${response.status}`);
+    }
+
+    return response.json();
+}

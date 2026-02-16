@@ -1,0 +1,558 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { FetchDemo } from '../components/FetchDemo';
+---
+
+<Layout>
+	<section class="hero-section">
+		<div class="container">
+			<div class="hero-content">
+				<h1 class="hero-title">The Professional <br class="md:hidden" />Research Tool for Reddit</h1>
+				<p class="hero-subtitle">
+					Analyze threads, export clean datasets for LLMs, and track sentiment over time.
+					<br class="hidden md:block" />
+					Join 1000+ researchers using Reddit Keeper to understand the conversation.
+				</p>
+				
+                <div class="interactive-demo">
+                    <FetchDemo client:load />
+                </div>
+			</div>
+		</div>
+	</section>
+
+	<section class="features-section" id="features">
+		<div class="container">
+            <div class="section-header">
+			    <h2 class="section-title">Everything you need to <span class="text-gradient">understand</span> the conversation</h2>
+                <p class="section-subtitle">Stop copy-pasting. Start analyzing.</p>
+            </div>
+			<div class="features-grid">
+				<div class="feature-card">
+					<div class="feature-icon">📄</div>
+					<h3>Clean Exports</h3>
+					<p>Convert messy Reddit threads into structured Markdown, JSON, or plain text perfect for LLM context windows.</p>
+				</div>
+				<div class="feature-card">
+					<div class="feature-icon">🤖</div>
+					<h3>AI Analysis</h3>
+					<p>Instantly summarize sentiment, extract feature requests, and identify recurring themes across thousands of comments.</p>
+				</div>
+				<div class="feature-card">
+					<div class="feature-icon">🗄️</div>
+					<h3>Permanent Archive</h3>
+					<p>Save threads to your personal library. Even if the original post is deleted, your data stays safe.</p>
+				</div>
+                <div class="feature-card">
+					<div class="feature-icon">⚡️</div>
+					<h3>Smart Filtering</h3>
+					<p>Filter by keyword, author, or sentiment score. Focus on what matters, ignore the noise.</p>
+				</div>
+                <div class="feature-card">
+					<div class="feature-icon">📊</div>
+					<h3>History Tracking</h3>
+					<p>Keep a 30-day history of your exports. Compare sentiment shift over time.</p>
+				</div>
+                <div class="feature-card">
+					<div class="feature-icon">🔒</div>
+					<h3>Privacy First</h3>
+					<p>We only store public data. Your research is private to your account.</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
+    <section class="pricing-section" id="pricing">
+        <div class="container">
+            <h2 class="section-title">Simple, transparent pricing</h2>
+            <p class="section-subtitle">Free for casual use. Pro for serious research.</p>
+            
+            <div class="pricing-grid">
+                <!-- Free Plan -->
+                <div class="pricing-card">
+                    <div class="pricing-header">
+                        <span class="plan-emoji">🆓</span>
+                        <h3>Free</h3>
+                        <div class="price">$0 <span class="period">/ forever</span></div>
+                    </div>
+                    <ul class="features-list">
+                        <li><span>Unlimited</span> threads per day</li>
+                        <li><span>50</span> comments per thread</li>
+                        <li>Markdown & JSON export</li>
+                        <li>Basic Filters</li>
+                    </ul>
+                    <a href="/app" class="btn btn-secondary btn-block">Current Plan</a>
+                </div>
+
+                <!-- Pro Plan -->
+                <div class="pricing-card pro active">
+                    <div class="badge">Most Popular</div>
+                    <div class="pricing-header">
+                        <span class="plan-emoji">⚡</span>
+                        <h3>Pro</h3>
+                        <div class="price">$29 <span class="period">/ month</span></div>
+                    </div>
+                    <ul class="features-list">
+                        <li><span>Unlimited</span> threads per day</li>
+                        <li class="highlight"><span>Unlimited</span> comments</li>
+                        <li class="highlight">Bulk Download</li>
+                        <li class="highlight">Export History (30 days)</li>
+                        <li class="highlight">Priority API access</li>
+                    </ul>
+                    <a href="/app" class="btn btn-primary btn-block">Upgrade to Pro</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="faq-section">
+        <div class="container">
+            <h2 class="section-title">Frequently Asked Questions</h2>
+            <div class="faq-grid">
+                <div class="faq-item">
+                    <h3>Is it really free?</h3>
+                    <p>Yes! You can fetch and export unlimited threads for free. We only limit the number of comments to 50 per thread on the free plan.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>What formats do you support?</h3>
+                    <p>We export to Clean Markdown (great for reading), JSON (for developers), and Plain Text (for copying).</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Do you support NSFW content?</h3>
+                    <p>Yes, but you must be signed in to verify your age, per Reddit's API policies.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Can I cancel anytime?</h3>
+                    <p>Absolutely. You can cancel your Pro subscription with one click from your dashboard. You'll keep access until the end of your billing cycle.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Call to Action -->
+    <section class="cta-section">
+        <div class="container">
+            <div class="cta-content">
+                <h2>Ready to streamline your research?</h2>
+                <a href="/app" class="btn btn-primary btn-xl">Get Started Now</a>
+            </div>
+        </div>
+    </section>
+</Layout>
+
+<style>
+    /* Hero Section */
+	.hero-section {
+		padding: 80px 0 60px;
+        text-align: center;
+        background: radial-gradient(circle at 50% 20%, rgba(255, 69, 0, 0.05) 0%, transparent 60%);
+	}
+
+    .hero-title {
+        font-size: 3.5rem;
+        line-height: 1.1;
+        font-weight: 800;
+        margin-bottom: 24px;
+        background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+        font-size: 1.25rem;
+        color: var(--text-secondary);
+        max-width: 600px;
+        margin: 0 auto 40px;
+    }
+
+    .interactive-demo {
+        max-width: 700px;
+        margin: 0 auto;
+    }
+
+    /* Features Section */
+    .features-section {
+        padding: 80px 0;
+        background: var(--bg-tertiary); /* Slight contrast */
+    }
+
+    .section-header {
+        text-align: center;
+        max-width: 600px;
+        margin: 0 auto 48px;
+    }
+
+    .section-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 16px;
+    }
+
+    .text-gradient {
+        background: linear-gradient(135deg, #FF4500 0%, #FF8717 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .section-subtitle {
+        font-size: 1.1rem;
+        color: var(--text-secondary);
+    }
+
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 32px;
+    }
+
+    .feature-card {
+        background: var(--bg-card);
+        padding: 32px;
+        border-radius: var(--radius-xl);
+        border: 1px solid var(--border);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .feature-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-lg);
+        border-color: var(--bg-accent);
+    }
+
+    .feature-icon {
+        font-size: 3rem;
+        margin-bottom: 20px;
+    }
+
+    .feature-card h3 {
+        font-size: 1.5rem;
+        margin-bottom: 12px;
+    }
+
+    .feature-card p {
+        color: var(--text-secondary);
+    }
+
+    /* Pricing Section */
+    .pricing-section {
+        padding: 100px 0;
+        text-align: center;
+    }
+
+    .pricing-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 400px)); /* Wider cards */
+        gap: 32px;
+        justify-content: center;
+        margin-top: 60px;
+        align-items: center; /* Vertical center alignment */
+    }
+
+    .pricing-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        padding: 40px;
+        text-align: left;
+        position: relative;
+    }
+
+    .pricing-card.pro {
+        border-color: var(--bg-accent);
+        box-shadow: 0 0 0 1px var(--bg-accent), var(--shadow-lg);
+        transform: scale(1.05); /* Slightly bigger */
+        z-index: 1;
+    }
+
+    .pricing-header h3 {
+        font-size: 1.5rem;
+        margin: 12px 0;
+    }
+
+    .price {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--text-primary);
+    }
+
+    .period {
+        font-size: 1rem;
+        font-weight: 500;
+        color: var(--text-tertiary);
+    }
+
+    .features-list {
+        list-style: none;
+        padding: 0;
+        margin: 32px 0;
+    }
+
+    .features-list li {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-light);
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .features-list li::before {
+        content: "✓";
+        color: var(--score-positive);
+        font-weight: bold;
+    }
+
+    .features-list li.highlight {
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .features-list li span {
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .badge {
+        position: absolute;
+        top: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #FF4500 0%, #FF8717 100%);
+        color: white;
+        padding: 4px 12px;
+        border-radius: var(--radius-full);
+        font-size: 0.8rem;
+        font-weight: 700;
+    }
+
+    .btn-block {
+        display: flex;
+        width: 100%;
+    }
+
+    /* FAQ Section */
+    .faq-section {
+        padding: 100px 0;
+        background: var(--bg-tertiary);
+    }
+
+    .faq-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 40px;
+        max-width: 900px;
+        margin: 40px auto 0;
+    }
+
+    .faq-item h3 {
+        font-size: 1.25rem;
+        margin-bottom: 12px;
+    }
+
+    .faq-item p {
+        color: var(--text-secondary);
+        line-height: 1.6;
+    }
+
+    /* CTA Section */
+    .cta-section {
+        padding: 100px 0;
+        background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-input) 100%);
+        text-align: center;
+    }
+    
+    .cta-content {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .cta-content h2 {
+        font-size: 2.5rem;
+        margin-bottom: 32px;
+    }
+
+    .btn-xl {
+        padding: 20px 40px;
+        font-size: 1.25rem;
+    }
+
+    /* Demo Component Styles */
+    :global(.demo-form) {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 24px;
+        text-align: center;
+    }
+
+    :global(.input-group) {
+        display: flex;
+        gap: 8px;
+        background: var(--bg-secondary);
+        padding: 8px;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--border);
+    }
+
+    :global(.demo-input) {
+        flex: 1;
+        border: none;
+        background: transparent;
+        padding: 0 16px;
+        font-size: 1rem;
+        color: var(--text-primary);
+        outline: none;
+    }
+    
+    :global(.demo-input:focus) {
+        outline: none;
+    }
+
+    :global(.demo-btn) {
+        white-space: nowrap;
+    }
+
+    :global(.demo-hint) {
+        font-size: 0.85rem;
+        color: var(--text-tertiary);
+    }
+
+    :global(.demo-result) {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        text-align: left;
+        animation: slideIn 0.3s ease;
+    }
+
+    :global(.result-header) {
+        margin-bottom: 16px;
+    }
+
+    :global(.subreddit) {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+    }
+
+    :global(.post-title) {
+        font-size: 1.25rem;
+        margin: 8px 0;
+    }
+
+    :global(.meta) {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        display: flex;
+        gap: 16px;
+    }
+
+    :global(.result-preview) {
+        position: relative;
+        background: var(--bg-input);
+        padding: 16px;
+        border-radius: var(--radius-md);
+        overflow: hidden;
+    }
+
+    :global(.code-block) {
+        font-family: 'Consolas', monospace;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        opacity: 0.7;
+    }
+
+    :global(.preview-overlay) {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 120px;
+        background: linear-gradient(to bottom, transparent 0%, var(--bg-card) 90%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        padding-bottom: 24px;
+    }
+
+    :global(.preview-overlay p) {
+        margin-bottom: 12px;
+        font-weight: 600;
+    }
+
+    :global(.result-actions) {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+
+    :global(.btn-sm) {
+        padding: 8px 16px;
+        font-size: 0.85rem;
+    }
+
+    :global(.comments-preview) {
+        max-height: 400px;
+        overflow-y: auto;
+        padding-right: 8px;
+        margin-bottom: 24px;
+        /* Scrollbar styling */
+        scrollbar-width: thin;
+        scrollbar-color: var(--border) transparent;
+    }
+
+    :global(.comment-item) {
+        background: var(--bg-secondary);
+        padding: 16px;
+        border-radius: var(--radius-md);
+        margin-bottom: 12px;
+        border: 1px solid var(--border-light);
+    }
+
+    :global(.comment-author) {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+    }
+
+    :global(.comment-body) {
+        font-size: 0.9rem;
+        line-height: 1.5;
+        color: var(--text-primary);
+        white-space: pre-wrap;
+    }
+
+    :global(.cta-overlay) {
+        position: relative;
+        background: var(--bg-card);
+        padding: 32px;
+        text-align: center;
+        border-top: 1px solid var(--border);
+        margin-top: -20px; /* Overlap slightly */
+        z-index: 10;
+    }
+    
+    :global(.cta-content p) {
+        margin-bottom: 16px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    :global(.cta-buttons) {
+        display: flex;
+        gap: 16px;
+        justify-content: center;
+    }
+
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>

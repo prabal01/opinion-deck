@@ -1,0 +1,150 @@
+---
+import '../styles/theme.css';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="description" content="Reddit Keeper — Export Reddit threads to Markdown and JSON for AI analysis." />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Reddit Keeper — Professional Reddit Research Tool</title>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+	</head>
+	<body>
+		<header class="app-header">
+			<div class="header-content">
+				<a href="/" class="logo">
+					<span class="logo-icon" aria-hidden="true">📥</span>
+					<h1 class="logo-text">Reddit Keeper</h1>
+					<span class="logo-tagline">Export threads for AI & Research</span>
+				</a>
+				<div class="header-actions">
+                    <a href="/app" class="btn btn-secondary">Go to App</a>
+					<a href="/app" class="btn btn-primary">Sign In</a>
+				</div>
+			</div>
+		</header>
+		
+		<main class="app-main">
+			<slot />
+		</main>
+
+		<footer class="app-footer">
+			<div class="container footer-content">
+				<p class="copyright">
+					&copy; {new Date().getFullYear()} Reddit Keeper. Built for the community.
+				</p>
+				<nav class="footer-links">
+					<a href="/app">Dashboard</a>
+					<a href="#">Contact</a>
+					<a href="#">Terms</a>
+				    <a href="#">Privacy</a>
+				</nav>
+			</div>
+		</footer>
+	</body>
+</html>
+
+<style>
+	html, body {
+		margin: 0;
+		padding: 0;
+		width: 100%;
+		height: 100%;
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+	}
+
+    /* Header Styles (Ported) */
+    .app-header {
+        background: var(--bg-glass);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        width: 100%;
+    }
+
+    .header-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px;
+    }
+
+    .logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+    }
+
+    .logo-text {
+        font-size: 1.25rem;
+        font-weight: 800;
+        margin: 0;
+        background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: var(--text-primary);
+    }
+
+    .logo-icon {
+        font-size: 1.5rem;
+    }
+
+    .logo-tagline {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        font-weight: 600;
+        padding: 4px 10px;
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-full);
+        display: inline-block;
+        margin-left: 8px;
+    }
+
+    @media (max-width: 768px) {
+        .logo-tagline { display: none; }
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 12px;
+    }
+
+    /* Footer Styles */
+    .app-footer {
+        padding: 40px 0;
+        border-top: 1px solid var(--border);
+        margin-top: 80px;
+        background: var(--bg-secondary);
+    }
+
+    .footer-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .footer-links {
+        display: flex;
+        gap: 24px;
+    }
+
+    .footer-links a {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+    }
+
+    .footer-links a:hover {
+        color: var(--text-primary);
+    }
+</style>

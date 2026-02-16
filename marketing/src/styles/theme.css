@@ -1,0 +1,157 @@
+/* ==============================
+   DESIGN SYSTEM — CSS Custom Properties
+   Ported from web/src/index.css for Brand Consistency
+   ============================== */
+
+:root {
+    /* Colors — Light */
+    --bg-primary: #f8f9fb;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f0f2f5;
+    --bg-input: #ffffff;
+    --bg-hover: #eef1f6;
+    --bg-accent: #ff4500;
+    --bg-accent-hover: #e03d00;
+    --bg-glass: rgba(255, 255, 255, 0.72);
+
+    --text-primary: #1a1a2e;
+    --text-secondary: #5a5e73;
+    --text-tertiary: #8e92a4;
+    --text-on-accent: #ffffff;
+    --text-link: #0066ff;
+
+    --border: #e2e5ed;
+    --border-light: #eef1f6;
+
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.10);
+    --shadow-glow: 0 0 0 3px rgba(255, 69, 0, 0.15);
+
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-full: 9999px;
+
+    /* Badges */
+    --badge-op: #ff4500;
+    --badge-mod: #22c55e;
+    --badge-sticky: #f59e0b;
+
+    --score-positive: #22c55e;
+    --score-negative: #ef4444;
+
+    --error-bg: #fef2f2;
+    --error-text: #dc2626;
+    --error-border: #fca5a5;
+
+    /* Added for components */
+    --bg-card: #ffffff;
+    --border-color: #e2e5ed;
+}
+
+/* Dark Mode (Default for Marketing Site if matching app) */
+[data-theme="dark"],
+:root.dark {
+    --bg-primary: #0f0f17;
+    --bg-secondary: #1a1a2e;
+    --bg-tertiary: #16162a;
+    --bg-input: #1e1e38;
+    --bg-hover: #252545;
+    --bg-accent: #ff4500;
+    --bg-accent-hover: #ff5722;
+    --bg-glass: rgba(26, 26, 46, 0.80);
+
+    --text-primary: #e8e8f0;
+    --text-secondary: #a0a0b8;
+    --text-tertiary: #6e6e88;
+    --text-on-accent: #ffffff;
+    --text-link: #60a5fa;
+
+    --border: #2a2a45;
+    --border-light: #222240;
+
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+    --shadow-glow: 0 0 0 3px rgba(255, 69, 0, 0.3);
+
+    --error-bg: #2d1515;
+    --error-text: #fca5a5;
+    --error-border: #7f1d1d;
+
+    /* Added for components */
+    --bg-card: #1a1a2e;
+    --border-color: #2a2a45;
+}
+
+/* Base Resets & Typography */
+html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    scroll-behavior: smooth;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+a {
+    color: var(--text-link);
+    text-decoration: none;
+    transition: opacity 0.2s;
+}
+
+a:hover {
+    opacity: 0.8;
+}
+
+/* Utility Classes */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--bg-accent) 0%, #FF8717 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(255, 69, 0, 0.25);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(255, 69, 0, 0.35);
+}
+
+.btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-hover);
+}

@@ -19,6 +19,8 @@ interface FolderContextType {
     createFolder: (name: string, description?: string) => Promise<Folder>;
     deleteFolder: (id: string) => Promise<void>;
     saveThread: (folderId: string, threadData: any) => Promise<void>;
+    getFolderThreads: (folderId: string) => Promise<any[]>;
+    analyzeFolder: (folderId: string) => Promise<any>;
 }
 
 const FolderContext = createContext<FolderContextType | undefined>(undefined);
@@ -38,7 +40,10 @@ export const FolderProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const res = await fetch('/api/folders', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (!res.ok) throw new Error('Failed to fetch folders');
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || `Failed to fetch folders (${res.status})`);
+            }
             const data = await res.json();
             setFolders(data);
         } catch (err: any) {
@@ -110,6 +115,42 @@ export const FolderProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
     };
 
+
+    const getFolderThreads = async (folderId: string) => {
+        if (!user) return [];
+        try {
+            const token = await getIdToken();
+            const res = await fetch(`/api/folders/${folderId}/threads`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Failed to fetch threads');
+            return await res.json();
+        } catch (err: any) {
+            console.error(err);
+            return [];
+        }
+    };
+
+    const analyzeFolder = async (folderId: string) => {
+        if (!user) throw new Error('Not authenticated');
+        try {
+            const token = await getIdToken();
+            const res = await fetch(`/api/folders/${folderId}/analyze`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Analysis failed');
+            }
+            return await res.json();
+        } catch (err: any) {
+            console.error(err);
+            throw err;
+        }
+    };
+
     useEffect(() => {
         fetchFolders();
     }, [fetchFolders]);
@@ -122,7 +163,9 @@ export const FolderProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             fetchFolders,
             createFolder,
             deleteFolder,
-            saveThread
+            saveThread,
+            getFolderThreads,
+            analyzeFolder
         }}>
             {children}
         </FolderContext.Provider>
