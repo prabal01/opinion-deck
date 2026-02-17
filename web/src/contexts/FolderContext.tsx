@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { API_BASE } from '../lib/api';
 
 export interface Folder {
     id: string;
@@ -37,7 +38,7 @@ export const FolderProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setError(null);
         try {
             const token = await getIdToken();
-            const res = await fetch('/api/folders', {
+            const res = await fetch(`${API_BASE}/folders`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!res.ok) {
@@ -57,7 +58,7 @@ export const FolderProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!user) throw new Error('Not authenticated');
         try {
             const token = await getIdToken();
-            const res = await fetch('/api/folders', {
+            const res = await fetch(`${API_BASE}/folders`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -79,7 +80,7 @@ export const FolderProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!user) throw new Error('Not authenticated');
         try {
             const token = await getIdToken();
-            const res = await fetch(`/api/folders/${id}`, {
+            const res = await fetch(`${API_BASE}/folders/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -95,7 +96,7 @@ export const FolderProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!user) throw new Error('Not authenticated');
         try {
             const token = await getIdToken();
-            const res = await fetch(`/api/folders/${folderId}/threads`, {
+            const res = await fetch(`${API_BASE}/folders/${folderId}/threads`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -120,7 +121,7 @@ export const FolderProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!user) return [];
         try {
             const token = await getIdToken();
-            const res = await fetch(`/api/folders/${folderId}/threads`, {
+            const res = await fetch(`${API_BASE}/folders/${folderId}/threads`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!res.ok) throw new Error('Failed to fetch threads');
@@ -135,7 +136,7 @@ export const FolderProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!user) throw new Error('Not authenticated');
         try {
             const token = await getIdToken();
-            const res = await fetch(`/api/folders/${folderId}/analyze`, {
+            const res = await fetch(`${API_BASE}/folders/${folderId}/analyze`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
