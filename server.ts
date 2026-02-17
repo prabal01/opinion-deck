@@ -31,7 +31,7 @@ import {
     saveThreadToFolder,
     getThreadsInFolder,
     saveAnalysis,
-    getLatestAnalysis
+    getLatestAnalysis, getFolderAnalyses,
 } from "./server/firestore.js";
 import { analyzeThreads } from "./server/ai.js";
 
@@ -183,111 +183,18 @@ function truncateComments(comments: Comment[], limit: number): Comment[] {
 
 // ── API Routes ─────────────────────────────────────────────────────
 
-app.post("/api/fetch", rateLimiterMiddleware, async (req, res) => {
+import { getUserStats, updateStats } from "./server/firestore.js";
+
+app.get("/api/user/stats", async (req, res) => {
+    if (!req.user) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
     try {
-        const { url, sort = "confidence" } = req.body;
-
-        if (!url) {
-            res.status(400).json({ error: "URL is required" });
-            return;
-        }
-
-        // Allow public access for demo, but ensure rate limits
-        // The rateLimiterMiddleware already prevents abuse
-        const config = req.user ? await getEffectiveConfig(req) : await getPlanConfig("free");
-
-        const result = await fetchQueue.add(async () => {
-            const urlInfo = parseRedditUrl(url);
-            const jsonUrl = buildJsonUrl(urlInfo, sort);
-            const data = await fetchWithRetry(jsonUrl);
-
-            if (!Array.isArray(data) || data.length < 2) {
-                throw new Error("Invalid Reddit post URL.");
-            }
-
-            const postListing = data[0] as RedditThing<RedditListing<RedditPostData>>;
-            const rawPost = postListing.data.children[0].data;
-            const post = transformPost(rawPost);
-
-            if (!urlInfo.subreddit) urlInfo.subreddit = post.subreddit;
-
-            const commentListing = data[1] as RedditThing<
-                RedditListing<RedditCommentData | RedditMoreData>
-            >;
-            const { comments, moreIds } = extractCommentsFromListing(commentListing);
-            const postFullname = rawPost.name;
-
-            if (moreIds.length > 0) {
-                await resolveMoreComments(
-                    comments,
-                    moreIds,
-                    postFullname,
-                    config.maxMoreCommentsBatches
-                );
-            }
-
-            return { post, comments, urlInfo };
-        });
-
-        if (!result) {
-            res.status(503).json({ error: "Server busy. Please try again." });
-            return;
-        }
-
-        const { post, comments } = result;
-        const totalCommentsFetched = countComments(comments);
-
-        const commentLimit = config.commentLimit;
-        const truncated = commentLimit !== -1 && totalCommentsFetched > commentLimit;
-        const finalComments = truncateComments(comments, commentLimit);
-
-        if (req.user?.uid) {
-            incrementFetchCount(req.user.uid).catch(() => { });
-        }
-
-        // Log analytics event (non-blocking)
-        logFetchEvent({
-            uid: req.user?.uid || "anonymous",
-            email: req.user?.email,
-            url,
-            plan: req.user?.plan || "free",
-            commentCount: totalCommentsFetched,
-            status: "success",
-            userAgent: req.headers["user-agent"],
-        }).catch(() => { });
-
-        res.json({
-            post,
-            comments: finalComments,
-            metadata: {
-                fetchedAt: new Date().toISOString(),
-                totalCommentsFetched,
-                commentsReturned: countComments(finalComments),
-                truncated,
-                commentLimit: truncated ? commentLimit : undefined,
-                toolVersion: TOOL_VERSION,
-            },
-        });
-    } catch (error: any) {
-        // Log failure event
-        logFetchEvent({
-            uid: req.user?.uid || "anonymous",
-            email: req.user?.email,
-            url: req.body?.url || "unknown",
-            plan: "unknown",
-            commentCount: 0,
-            status: "error",
-            error: error.message,
-            userAgent: req.headers["user-agent"],
-        }).catch(() => { });
-
-        if (error.message?.includes("timed out")) {
-            res.status(503).json({
-                error: "Server is busy. Please try again in a moment.",
-            });
-        } else {
-            res.status(500).json({ error: error.message });
-        }
+        const stats = await getUserStats(req.user.uid);
+        res.json(stats);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -325,6 +232,8 @@ app.post("/api/create-checkout-session", async (req, res) => {
     }
 
     try {
+        const { interval } = req.body;
+        console.log(`[Checkout] Creating session for user ${req.user.uid} (Interval: ${interval || 'month'})`);
         const url = await createCheckoutUrl(req.user.uid, req.user.email);
         res.json({ url });
     } catch (err: any) {
@@ -458,9 +367,19 @@ app.post("/api/folders/:id/analyze", async (req, res) => {
 
         // 3. Save & Return
         const parsedResult = JSON.parse(analysisResult);
+        // Inject timestamp for immediate frontend display
+        parsedResult.createdAt = new Date().toISOString();
 
         // Save to Firestore (Fire & Forget)
         saveAnalysis(req.user.uid, req.params.id, parsedResult, "gemini-flash-latest");
+
+        // Deduct Credit (Increment Usage)
+        await updateStats(req.user.uid, {
+            reportsGenerated: 1,
+            intelligenceScanned: savedThreads.length,
+            // Estimate hours saved (approx 5 mins per thread manual reading)
+            hoursSaved: parseFloat((savedThreads.length * 5 / 60).toFixed(1))
+        });
 
         res.json(parsedResult);
 
@@ -482,17 +401,109 @@ app.get("/api/folders/:id/analysis", async (req, res) => {
         return;
     }
     try {
-        const analysis = await getLatestAnalysis(req.user.uid, req.params.id);
-        if (!analysis) {
-            res.status(404).json({ error: "No analysis found" });
-            return;
-        }
-        res.json(analysis.data);
+        const analyses = await getFolderAnalyses(req.user.uid, req.params.id);
+        // Flatten the structure for the frontend
+        const flattened = analyses.map(a => ({
+            ...a.data,
+            id: a.id,
+            createdAt: a.createdAt || new Date().toISOString()
+        }));
+        res.json(flattened);
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
 });
 
+// ── Extension Extractions Routes ───────────────────────────────────
+
+import { saveExtractedData, listExtractions } from "./server/firestore.js";
+
+app.post("/api/extractions", async (req, res) => {
+    if (!req.user) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
+    try {
+        const { data } = req.body;
+        if (!data?.id) throw new Error("Invalid extraction data");
+
+        await saveExtractedData(req.user.uid, data);
+
+        // BRIDGE: If a folderId is provided, also save it to the folder's thread list
+        // so it appears in the dashboard folder view immediately.
+        if (data.folderId && data.folderId !== 'default') {
+            try {
+                // Apply Plan Limits (Truncate comments if on Free plan)
+                const commentLimit = req.user.config.commentLimit; // e.g. 50 or -1
+
+                // Detect the correct array key (Reddit/Twitter use flattenedComments, G2 uses reviews)
+                let arrayKey = 'flattenedComments';
+                if (Array.isArray(data.content.reviews)) {
+                    arrayKey = 'reviews';
+                } else if (Array.isArray(data.content.comments) && !data.content.flattenedComments) {
+                    arrayKey = 'comments';
+                }
+
+                let items = data.content[arrayKey] || [];
+                let originalCount = items.length;
+                let truncated = false;
+
+                if (commentLimit > 0 && originalCount > commentLimit) {
+                    console.log(`[Limit] Truncating ${arrayKey} from ${originalCount} to ${commentLimit} for user ${req.user.uid}`);
+                    items = items.slice(0, commentLimit);
+                    truncated = true;
+                }
+
+                // Update the content object with truncated array
+                const updatedContent = { ...data.content };
+                updatedContent[arrayKey] = items;
+                updatedContent.originalCommentCount = originalCount;
+                updatedContent.truncated = truncated;
+
+                // Adapt ExtractedData to what the dashboard expects for ThreadData
+                const threadPayload = {
+                    post: data.content.post || { title: data.title }, // Fallback for G2 which might not have 'post' object
+                    content: updatedContent,
+                    metadata: {
+                        fetchedAt: data.extractedAt,
+                        totalCommentsFetched: items.length,
+                        originalCommentCount: originalCount, // Persist for UI
+                        truncated: truncated,
+                        toolVersion: "ext-1.0.1",
+                        source: data.source
+                    }
+                };
+                await saveThreadToFolder(req.user.uid, data.folderId, threadPayload);
+            } catch (bridgeErr) {
+                console.error("[Bridge] Failed to link extraction to folder:", bridgeErr);
+            }
+        }
+
+        // If 'shouldAnalyze' is passed, trigger a background analysis job
+        if (data.shouldAnalyze) {
+            console.log(`[AI] Auto-analysis triggered for extraction: ${data.id}`);
+            // Logic to perform single extraction analysis would go here
+            // For now, we just mark that it was requested in the logs
+        }
+
+        res.json({ success: true, id: data.id });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get("/api/extractions", async (req, res) => {
+    if (!req.user) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
+    try {
+        const data = await listExtractions(req.user.uid);
+        res.json(data);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // ── Health Check ───────────────────────────────────────────────────
 
@@ -517,6 +528,6 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 // ── Start ──────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
-    console.log(`🚀 Reddit proxy server running on http://localhost:${PORT}`);
+    console.log(`🚀 OpinionDeck Platform Server running on http://localhost:${PORT}`);
     console.log(`   Fetch Queue: 20 concurrent | Analysis Queue: 5 concurrent`);
 });

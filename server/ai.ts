@@ -63,6 +63,7 @@ const model = genAI.getGenerativeModel({
                 },
                 // New Fields for Competitor/Research Intelligence
                 quality_score: { type: SchemaType.INTEGER, description: "0-100 score of how valuable this research data is" },
+                quality_reasoning: { type: SchemaType.STRING, description: "Explanation for why this score was given (e.g. 'High distinct pain points' or 'Vague general discussion')" },
                 relevance_explanation: { type: SchemaType.STRING },
                 buying_intent_signals: {
                     type: SchemaType.ARRAY,
@@ -87,13 +88,28 @@ const model = genAI.getGenerativeModel({
                         },
                         required: ["thread_id", "reason", "talking_points"]
                     }
+                },
+                potential_leads: {
+                    type: SchemaType.ARRAY,
+                    items: {
+                        type: SchemaType.OBJECT,
+                        properties: {
+                            username: { type: SchemaType.STRING, description: "Username of the potential customer" },
+                            platform: { type: SchemaType.STRING, description: "Platform (Reddit, X, HN)" },
+                            intent_context: { type: SchemaType.STRING, description: "Why they are a good lead (pain point, seeking solution)" },
+                            original_post_id: { type: SchemaType.STRING, description: "ID of the post/comment for reference" }
+                        },
+                        required: ["username", "platform", "intent_context", "original_post_id"]
+                    },
+                    description: "List of users who expressed strong pain points or buying intent for outreach goals"
                 }
             },
             required: [
                 "executive_summary", "themes", "feature_requests",
                 "pain_points", "sentiment_breakdown",
-                "quality_score", "relevance_explanation",
-                "buying_intent_signals", "engagement_opportunities"
+                "quality_score", "quality_reasoning", "relevance_explanation",
+                "buying_intent_signals", "engagement_opportunities",
+                "potential_leads"
             ]
         }
     }
@@ -131,15 +147,22 @@ You are a Strategic Market Researcher and Data Analyst. Your job is to analyze t
     
 **Analysis Goals:**
 1. **Analyze Quality**: Score the research value (0-100) based on detail, relevance to the context, and insight depth.
+   - **<40**: Low value (memes, off-topic, very short comments).
+   - **40-70**: Average value (general discussion, some opinions).
+   - **>70**: High value (detailed reviews, specific pain points, feature requests, buying intent).
+   - **>90**: Goldmine (proven buyers, detailed comparison of competitors, urgent problems).
+   - *CRITICAL*: Use the full range of scores. Do not default to 70-80.
 2. **Identify Signals**: Find specific "Buying Intent" signals (people looking for solutions, expressing willingness to pay).
 3. **Spot Opportunities**: Identify threads where engagement (replying) would be valuable.
 4. **Extract Themes**: Identify top recurring themes and feature requests with specific citation IDs.
-5. **Assess Sentiment**: Calculate overall sentiment breakdown.
+5. **Assess Sentiment**: Calculate overall sentiment breakdown (Essential: the percentages MUST sum to exactly 100%).
+6. **Identify Potential Leads**: Find specific users/usernames who are complaining about existing solutions or actively seeking a new tool. These are candidates for cold outreach.
 
 **Data Handling:**
 - You are provided with a minified text representation of threads.
 - READ EVERYTHING. Do not hallucinate.
 - Use the provided 'ID:xyz' format in comments for citations.
+- When extracting leads, provide the platform and username accurately from the text.
 `;
 
     const contextParts = threads.map(t => {

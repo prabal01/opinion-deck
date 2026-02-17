@@ -485,3 +485,63 @@
     gap: 0.75rem;
     margin-top: 2rem;
 }
+
+/* REPORT COLLAPSIBLE */
+.report-collapsible {
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    overflow: hidden;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.report-collapsible[open] {
+    box-shadow: var(--shadow-md);
+    border-color: var(--bg-accent);
+}
+
+.report-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 1.1rem;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    list-style: none;
+    transition: background 0.2s;
+    border-bottom: 1px solid transparent;
+}
+
+.report-collapsible[open] .report-summary {
+    border-bottom-color: var(--border-light);
+}
+
+.report-summary:hover {
+    background: var(--bg-tertiary);
+}
+
+.report-summary::-webkit-details-marker {
+    display: none;
+}
+
+.report-hint {
+    font-size: 0.85rem;
+    color: var(--text-tertiary);
+    font-weight: 500;
+}
+
+.report-content {
+    background: var(--bg-card);
+}
+
+/* Override internal spacing of AnalysisResults when inside collapsible */
+.report-content .analysis-results {
+    margin-top: 0;
+    padding: 1.5rem;
+    animation: none;
+    /* Disable slideUp since details handles expansion */
+}

@@ -34,7 +34,7 @@ export function UrlInput({ onFetch, loading }: UrlInputProps) {
                     id="reddit-url"
                     type="url"
                     className="url-input"
-                    placeholder="Paste Reddit post URL..."
+                    placeholder="Paste Reddit, HackerNews, or X/Twitter thread URL..."
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     disabled={loading}
@@ -75,7 +75,7 @@ export function UrlInput({ onFetch, loading }: UrlInputProps) {
                 </div>
             </div>
             <p id="url-hint" className="url-hint">
-                e.g. https://www.reddit.com/r/SideProject/comments/1r544g7/...
+                e.g. https://www.reddit.com/... or https://x.com/user/status/...
             </p>
         </form>
     );

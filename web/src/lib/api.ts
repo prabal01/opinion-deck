@@ -85,11 +85,12 @@ export async function fetchThread(options: FetchOptions): Promise<FetchResult> {
 
 // ── Create Checkout Session ────────────────────────────────────────
 
-export async function createCheckoutSession(): Promise<string> {
+export async function createCheckoutSession(interval: "month" | "year" = "month"): Promise<string> {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE}/create-checkout-session`, {
         method: "POST",
         headers,
+        body: JSON.stringify({ interval }),
     });
 
     if (!response.ok) {
@@ -133,6 +134,20 @@ export async function fetchFolderAnalysis(folderId: string): Promise<any | null>
     if (!response.ok) {
         const error = await response.json().catch(() => ({}));
         throw new Error(error.error || `Failed to fetch analysis: ${response.status}`);
+    }
+
+    return response.json();
+}
+export async function fetchUserStats(): Promise<any> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/user/stats`, {
+        method: "GET",
+        headers,
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || "Failed to fetch user stats");
     }
 
     return response.json();

@@ -44,7 +44,7 @@ export function CommentNode({ comment, postAuthor }: CommentNodeProps) {
                         } ${comment.distinguished === "moderator" ? "is-mod" : ""} ${isDeleted ? "is-deleted" : ""
                         }`}
                 >
-                    u/{comment.author}
+                    {comment.author}
                 </span>
                 {comment.isSubmitter && (
                     <span className="badge badge-op\" aria-label="Original poster">OP</span>

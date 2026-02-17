@@ -3,19 +3,19 @@ import { useAuth } from "../contexts/AuthContext";
 import { createCheckoutSession } from "../lib/api";
 
 const FEATURES = [
-    { name: "Threads per day", free: "Unlimited", pro: "Unlimited" },
-    { name: "Comments per thread", free: "Up to 50", pro: "All comments", highlight: true },
-    { name: "Export formats", free: "MD, JSON, Text", pro: "MD, JSON, Text" },
-    { name: "Comment filters", free: "✅", pro: "✅" },
-    { name: "Bulk download", free: "—", pro: "✅", highlight: true },
-    { name: "Export history", free: "—", pro: "30 days", highlight: true },
-    { name: "API access", free: "—", pro: "✅", highlight: true },
-    { name: "Priority queue", free: "—", pro: "✅", highlight: true },
+    { name: "AI Research Reports", free: "5 (One-time)", pro: "50 / month", highlight: true },
+    { name: "Research Folders", free: "1", pro: "Unlimited", highlight: true },
+    { name: "Max Comments / Thread", free: "50", pro: "5,000", highlight: true },
+    { name: "Saved Threads", free: "Up to 30", pro: "Up to 5,000", highlight: true },
+    { name: "Lead Extraction", free: "—", pro: "✅", highlight: true },
+    { name: "Unlimited Thread Exports", free: "✅", pro: "✅", highlight: true },
+    { name: "Priority Support", free: "—", pro: "✅" },
 ];
 
 export function PricingPage() {
     const { user, plan, signInWithGoogle } = useAuth();
     const [upgrading, setUpgrading] = useState(false);
+    const [interval, setInterval] = useState<"month" | "year">("year");
     const [error, setError] = useState<string | null>(null);
 
     const handleUpgrade = async () => {
@@ -27,12 +27,11 @@ export function PricingPage() {
             } catch {
                 return;
             }
-            // After sign-in, the flow continues
         }
 
         setUpgrading(true);
         try {
-            const url = await createCheckoutSession();
+            const url = await createCheckoutSession(interval);
             window.location.href = url;
         } catch (err: any) {
             setError(err.message);
@@ -47,78 +46,150 @@ export function PricingPage() {
         <section className="pricing-section" id="pricing" aria-labelledby="pricing-heading">
             <h2 id="pricing-heading" className="pricing-title">Simple, transparent pricing</h2>
             <p className="pricing-subtitle">
-                Free for small threads. Upgrade when you need the full power.
+                The intelligence you need, priced for scale.
             </p>
 
-            <div className="pricing-cards">
-                {/* Free Plan */}
-                <div className="pricing-card" aria-label="Free plan">
-                    <div className="pricing-card-header">
-                        <span className="plan-emoji" aria-hidden="true">🆓</span>
-                        <h3 className="plan-name">Free</h3>
-                        <div className="plan-price">
-                            <span className="price-amount">$0</span>
-                            <span className="price-period">/ forever</span>
-                        </div>
-                    </div>
-                    <ul className="plan-features" aria-label="Free plan features">
-                        {FEATURES.map((f) => (
-                            <li key={f.name} className="plan-feature">
-                                <span className="feature-name">{f.name}</span>
-                                <span className="feature-value free-value">{f.free}</span>
-                            </li>
-                        ))}
-                    </ul>
-                    <button className="plan-cta free-cta" disabled aria-label="Currently using free plan">
-                        {isPro ? "Downgrade not needed" : "Current Plan"}
-                    </button>
-                </div>
+            const isPro = plan === "pro";
 
-                {/* Pro Plan */}
-                <div className="pricing-card pricing-card-pro" aria-label="Pro plan">
-                    <div className="pricing-card-badge">Most Popular</div>
-                    <div className="pricing-card-header">
-                        <span className="plan-emoji" aria-hidden="true">⚡</span>
-                        <h3 className="plan-name">Pro</h3>
-                        <div className="plan-price">
-                            <span className="price-amount">$29</span>
-                            <span className="price-period">/ month</span>
+            return (
+            <section className="pricing-section" id="pricing" aria-labelledby="pricing-heading">
+                <h2 id="pricing-heading" className="pricing-title">Simple, transparent pricing</h2>
+                <p className="pricing-subtitle">
+                    The intelligence you need, priced for scale.
+                </p>
+
+                <div className="pricing-cards">
+                    {/* Free Plan */}
+                    <div className="pricing-card" aria-label="Free plan">
+                        <div className="pricing-card-header">
+                            <span className="plan-emoji" aria-hidden="true">🌱</span>
+                            <h3 className="plan-name">Free Trial</h3>
+                            <div className="plan-price">
+                                <span className="price-amount">$0</span>
+                                <span className="price-period">/ month</span>
+                            </div>
                         </div>
+                        <ul className="plan-features" aria-label="Free plan features">
+                            {FEATURES.map((f) => (
+                                <li key={f.name} className="plan-feature">
+                                    <span className="feature-name">{f.name}</span>
+                                    <span className="feature-value free-value">{f.free}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <button className="plan-cta free-cta" disabled aria-label="Currently using free plan">
+                            {isPro ? "Current" : "Active"}
+                        </button>
                     </div>
-                    <ul className="plan-features" aria-label="Pro plan features">
-                        {FEATURES.map((f) => (
-                            <li
-                                key={f.name}
-                                className={`plan-feature ${f.highlight ? "highlight" : ""}`}
+
+                    {/* Pro Plan */}
+                    <div className="pricing-card pricing-card-pro" aria-label="Pro plan">
+                        <div className="pricing-card-badge">Most Popular</div>
+                        <div className="pricing-card-header">
+                            <span className="plan-emoji" aria-hidden="true">💎</span>
+                            <h3 className="plan-name">Pro</h3>
+
+                            <div className="card-toggle-row">
+                                <span className={`toggle-label ${interval === "month" ? "active" : ""}`}>Monthly</span>
+                                <button
+                                    className={`pricing-toggle ${interval}`}
+                                    onClick={() => setInterval(interval === "month" ? "year" : "month")}
+                                    aria-label="Toggle billing"
+                                >
+                                    <div className="toggle-handle" />
+                                </button>
+                                <span className={`toggle-label ${interval === "year" ? "active" : ""}`}>Yearly</span>
+                            </div>
+
+                            <div className="plan-price">
+                                <span className="price-amount">${interval === "month" ? "9" : "7.50"}</span>
+                                <span className="price-period">/ month</span>
+                            </div>
+                            <div className="billing-msg">
+                                {interval === "month" ? "Billed monthly" : "Billed $90 yearly"}
+                            </div>
+                        </div>
+                        <ul className="plan-features" aria-label="Pro plan features">
+                            {FEATURES.map((f) => (
+                                <li
+                                    key={f.name}
+                                    className={`plan-feature ${f.highlight ? "highlight" : ""}`}
+                                >
+                                    <span className="feature-name">{f.name}</span>
+                                    <span className="feature-value pro-value">{f.pro}</span>
+                                </li>
+                            ))}
+                        </ul>
+
+                        {isPro ? (
+                            <button className="plan-cta pro-cta active" disabled aria-label="Currently on Pro plan">
+                                ✓ Active
+                            </button>
+                        ) : (
+                            <button
+                                className="plan-cta pro-cta"
+                                onClick={handleUpgrade}
+                                disabled={upgrading}
+                                aria-label={`Upgrade to Pro for ${interval === "month" ? "$9/mo" : "$7.50/mo"}`}
                             >
-                                <span className="feature-name">{f.name}</span>
-                                <span className="feature-value pro-value">{f.pro}</span>
-                            </li>
-                        ))}
-                    </ul>
+                                {upgrading ? "Redirecting..." : "Upgrade to Pro →"}
+                            </button>
+                        )}
 
-                    {isPro ? (
-                        <button className="plan-cta pro-cta active" disabled aria-label="Currently on Pro plan">
-                            ✓ Active
-                        </button>
-                    ) : (
-                        <button
-                            className="plan-cta pro-cta"
-                            onClick={handleUpgrade}
-                            disabled={upgrading}
-                            aria-label="Upgrade to Reddit Keeper Pro for $29 per month"
-                        >
-                            {upgrading ? "Redirecting..." : "Upgrade to Pro →"}
-                        </button>
-                    )}
-
-                    {error && (
-                        <p className="pricing-error" role="alert">
-                            {error}
-                        </p>
-                    )}
+                        {error && (
+                            <p className="pricing-error" role="alert">
+                                {error}
+                            </p>
+                        )}
+                    </div>
                 </div>
-            </div>
-        </section>
-    );
+                <style>{`
+                .card-toggle-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin: 12px 0;
+                    font-size: 0.9rem;
+                    color: var(--text-tertiary);
+                }
+                .toggle-label.active {
+                    color: var(--text-primary);
+                    font-weight: 600;
+                }
+                .pricing-toggle {
+                    width: 44px;
+                    height: 24px;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    position: relative;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }
+                .pricing-toggle.year {
+                    background: var(--bg-accent);
+                    border-color: var(--bg-accent);
+                }
+                .toggle-handle {
+                    width: 18px;
+                    height: 18px;
+                    background: white;
+                    border-radius: 50%;
+                    position: absolute;
+                    top: 2px;
+                    left: 2px;
+                    transition: transform 0.2s ease;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                }
+                .pricing-toggle.year .toggle-handle {
+                    transform: translateX(20px);
+                }
+                .billing-msg {
+                    font-size: 0.85rem;
+                    color: var(--text-tertiary);
+                    margin-top: 4px;
+                }
+            `}</style>
+            </section>
+            );
 }

@@ -32,7 +32,7 @@ export function ContactUs({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
             <p>We're here to help with any questions or technical issues.</p>
             <div className="contact-info">
                 <h3>Support Email</h3>
-                <p><a href="mailto:support@redditkeeper.com">support@redditkeeper.com</a></p>
+                <p><a href="mailto:support@omniresearch.com">support@omniresearch.com</a></p>
 
                 <h3>Response Time</h3>
                 <p>We typically respond within 24-48 business hours.</p>
@@ -51,13 +51,13 @@ export function RefundPolicy({ isOpen, onClose }: { isOpen: boolean; onClose: ()
             <div className="policy-section">
                 <h3>7-Day Money Back Guarantee</h3>
                 <p>
-                    If you are not satisfied with Reddit Keeper Pro, you can request a full refund within 7 days
+                    If you are not satisfied with OmniResearch Pro, you can request a full refund within 7 days
                     of your initial purchase. No questions asked.
                 </p>
 
                 <h3>How to Request a Refund</h3>
                 <p>
-                    Please email us at <a href="mailto:support@redditkeeper.com">support@redditkeeper.com</a>
+                    Please email us at <a href="mailto:support@opiniondeck.com">support@opiniondeck.com</a>
                     with your account email and transaction ID.
                 </p>
 
@@ -76,12 +76,12 @@ export function TermsOfService({ isOpen, onClose }: { isOpen: boolean; onClose: 
         <LegalModal title="Terms of Service" isOpen={isOpen} onClose={onClose}>
             <div className="policy-section">
                 <h3>1. Acceptance of Terms</h3>
-                <p>By using Reddit Keeper, you agree to these terms.</p>
+                <p>By using OmniResearch, you agree to these terms.</p>
 
                 <h3>2. Usage License</h3>
                 <p>
-                    We provide a tool to export Reddit content. You are responsible for ensuring your use of
-                    exported data complies with Reddit's Terms of Service and data privacy laws.
+                    We provide a tool to export content from social platforms. You are responsible for ensuring your use of
+                    exported data complies with each platform's Terms of Service and data privacy laws.
                 </p>
 
                 <h3>3. Pro Subscription</h3>
@@ -104,9 +104,9 @@ export function PrivacyPolicy({ isOpen, onClose }: { isOpen: boolean; onClose: (
                     email address and subscription status.
                 </p>
 
-                <h3>2. Reddit Data</h3>
+                <h3>2. Platform Data</h3>
                 <p>
-                    We do not store the content of the Reddit threads you fetch. Data is processed in real-time
+                    We do not store the content of the threads or posts you fetch. Data is processed in real-time
                     and sent directly to your browser.
                 </p>
 

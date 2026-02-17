@@ -10,13 +10,26 @@ import { UpgradePrompt } from "./UpgradePrompt";
 import { PricingPage } from "./PricingPage";
 import { SEOContent } from "./SEOContent";
 import { useRedditThread } from "../hooks/useRedditThread";
-import { FolderList } from "./FolderList";
-import { applyFilters } from "@core/utils/filters.js";
 import type { CLIOptions } from "@core/reddit/types.js";
+import { applyFilters } from "@core/utils/filters.js";
 import { useNavigate } from "react-router-dom";
+import { PremiumLoader, ButtonLoader } from "./PremiumLoader";
+import { FolderList } from "./FolderList";
+import { ExtensionModal } from "./ExtensionModal";
+import { BRANDING } from "../constants/branding";
+
+import { fetchUserStats } from "../lib/api";
 
 export function HomeView() {
-    const { plan } = useAuth();
+    const { plan, user } = useAuth();
+    const [stats, setStats] = useState<any>(null);
+
+    useEffect(() => {
+        if (user) {
+            fetchUserStats().then(setStats).catch(console.error);
+        }
+    }, [user]);
+
     const { thread, metadata, loading, error, fetch: fetchThread } = useRedditThread();
     const [filters, setFilters] = useState<FilterState>({
         minScore: undefined,
@@ -31,6 +44,12 @@ export function HomeView() {
     const [showNewFolder, setShowNewFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
     const newFolderInputRef = useRef<HTMLInputElement>(null);
+    const { fetchFolders } = useFolders();
+    const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
+
+    useEffect(() => {
+        fetchFolders();
+    }, [fetchFolders]);
 
     const handleFetch = (url: string, sort: string) => {
         fetchThread({ url, sort });
@@ -88,6 +107,13 @@ export function HomeView() {
         }
     }, [showNewFolder]);
 
+    // Detect extension error and show modal
+    useEffect(() => {
+        if (error && error.includes("Extension not found")) {
+            setIsExtensionModalOpen(true);
+        }
+    }, [error]);
+
     const filteredThread = useMemo(() => {
         if (!thread) return null;
 
@@ -126,23 +152,7 @@ export function HomeView() {
             )}
 
             {loading && (
-                <div className="loading-state" role="status" aria-label="Loading thread">
-                    <div className="skeleton-post">
-                        <div className="skeleton-line skeleton-title" />
-                        <div className="skeleton-line skeleton-meta" />
-                        <div className="skeleton-line skeleton-body" />
-                        <div className="skeleton-line skeleton-body short" />
-                    </div>
-                    <div className="skeleton-comments">
-                        {[...Array(5)].map((_, i) => (
-                            <div key={i} className="skeleton-comment" style={{ marginLeft: `${(i % 3) * 24}px` }}>
-                                <div className="skeleton-line skeleton-comment-header" />
-                                <div className="skeleton-line skeleton-comment-body" />
-                            </div>
-                        ))}
-                    </div>
-                    <p className="loading-text">Fetching thread from Reddit...</p>
-                </div>
+                <PremiumLoader text="Fetching data from platform..." />
             )}
 
             {filteredThread && !loading && (
@@ -185,7 +195,7 @@ export function HomeView() {
                                             disabled={!newFolderName.trim() || saveStatus === 'saving'}
                                             aria-label="Create folder and save thread"
                                         >
-                                            {saveStatus === 'saving' ? '...' : '✓'}
+                                            {saveStatus === 'saving' ? <ButtonLoader /> : '✓'}
                                         </button>
                                         <button
                                             className="new-folder-cancel-btn"
@@ -215,12 +225,46 @@ export function HomeView() {
             )}
 
             {!thread && !loading && !error && (
-                <>
+                <div className="dashboard-home">
+                    <header className="dashboard-header">
+                        <h1>Welcome to {BRANDING.NAME}</h1>
+                        <p className="subtitle">Your Strategic Market Intelligence Hub</p>
+                    </header>
+
+                    <div className="impact-metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', margin: '30px 0' }}>
+                        <div className="metric-card" style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                            <div className="label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Intelligence Scanned</div>
+                            <div className="value" style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--primary-color)' }}>{stats?.intelligenceScanned || 0} <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>points</span></div>
+                        </div>
+                        <div className="metric-card" style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                            <div className="label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Active Folders</div>
+                            <div className="value" style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)' }}>{folders.length}</div>
+                        </div>
+                        <div className="metric-card" style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                            <div className="label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Reports Generated</div>
+                            <div className="value" style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--success-color)' }}>{stats?.reportsGenerated || 0}</div>
+                        </div>
+                        <div className="metric-card" style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                            <div className="label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Hours Saved</div>
+                            <div className="value" style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--warning-color)' }}>{stats?.hoursSaved || 0} <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>h</span></div>
+                        </div>
+                    </div>
+
                     <FolderList onSelect={(folder) => navigate(`/folders/${folder.id}`)} />
-                    {plan !== "pro" && <PricingPage />}
-                    <SEOContent />
-                </>
+
+                    {!user && (
+                        <>
+                            {plan !== "pro" && <PricingPage />}
+                            <SEOContent />
+                        </>
+                    )}
+                </div>
             )}
+
+            <ExtensionModal
+                isOpen={isExtensionModalOpen}
+                onClose={() => setIsExtensionModalOpen(false)}
+            />
         </>
     );
 }

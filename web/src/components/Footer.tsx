@@ -10,7 +10,7 @@ export function Footer() {
         <footer className="app-footer">
             <div className="footer-content">
                 <p className="copyright">
-                    &copy; {new Date().getFullYear()} Reddit Keeper. Built with ❤️ for the community.
+                    &copy; {new Date().getFullYear()} OpinionDeck. Built with ❤️ for the community.
                 </p>
                 <nav className="footer-links">
                     <button onClick={() => setActiveModal("contact")}>Contact Us</button>

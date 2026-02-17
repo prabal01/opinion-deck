@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useFolders } from '../contexts/FolderContext';
+import { useAuth } from '../contexts/AuthContext';
 import { ThreadView } from './ThreadView';
 import { AnalysisResults } from './AnalysisResults';
+import { PremiumLoader, ButtonLoader } from './PremiumLoader';
 import './Folders.css';
 import './AnalysisResults.css';
 import { fetchFolderAnalysis } from '../lib/api';
@@ -17,9 +19,10 @@ interface SavedThread {
 }
 
 export const FolderDetail: React.FC = () => {
-    const { folderId } = useParams<{ folderId: string }>();
+    const { folderId, threadId } = useParams<{ folderId: string; threadId?: string }>();
     const navigate = useNavigate();
     const { folders, getFolderThreads, deleteFolder, analyzeFolder, loading: foldersLoading } = useFolders();
+    const { refreshStats } = useAuth();
 
     const folder = folders.find(f => f.id === folderId);
 
@@ -28,7 +31,7 @@ export const FolderDetail: React.FC = () => {
     const [selectedThread, setSelectedThread] = useState<any | null>(null);
 
     // Analysis State
-    const [analysisData, setAnalysisData] = useState<any | null>(null);
+    const [analyses, setAnalyses] = useState<any[]>([]);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisError, setAnalysisError] = useState<string | null>(null);
 
@@ -41,17 +44,29 @@ export const FolderDetail: React.FC = () => {
             if (mounted) {
                 setThreads(data);
                 setLoading(false);
+
+                // Deep link selection
+                if (threadId) {
+                    const target = data.find((t: any) => t.id === threadId || t.data?.id === threadId);
+                    if (target) setSelectedThread(target.data);
+                }
             }
         });
         return () => { mounted = false; };
-    }, [folderId, folder, getFolderThreads]);
+    }, [folderId, folder, getFolderThreads, threadId]);
 
     // Fetch existing analysis on load
     useEffect(() => {
         if (!folderId) return;
         fetchFolderAnalysis(folderId)
             .then(data => {
-                if (data) setAnalysisData(data);
+                // API now returns an array of analyses
+                if (Array.isArray(data)) {
+                    setAnalyses(data);
+                } else if (data) {
+                    // Backward compatibility if API wraps or returns single object
+                    setAnalyses([data]);
+                }
             })
             .catch(err => console.error("Failed to load analysis:", err));
     }, [folderId]);
@@ -91,7 +106,9 @@ export const FolderDetail: React.FC = () => {
         setAnalysisError(null);
         try {
             const result = await analyzeFolder(folderId);
-            setAnalysisData(result);
+            // Prepend the new analysis so it's first
+            setAnalyses(prev => [result, ...prev]);
+            await refreshStats(); // Update credits in sidebar
         } catch (err: any) {
             setAnalysisError(err.message || "Failed to analyze folder");
         } finally {
@@ -133,7 +150,10 @@ export const FolderDetail: React.FC = () => {
     if (selectedThread) {
         return (
             <div className="folder-detail-view">
-                <button className="btn-secondary" onClick={() => setSelectedThread(null)}>
+                <button className="btn-secondary" onClick={() => {
+                    setSelectedThread(null);
+                    navigate(`/folders/${folderId}`);
+                }}>
                     ← Back to Folder
                 </button>
                 <div style={{ marginTop: '1rem' }}>
@@ -144,7 +164,7 @@ export const FolderDetail: React.FC = () => {
     }
 
     if (foldersLoading && !folder) {
-        return <div className="loading-state"><p className="loading-text">Loading folder...</p></div>;
+        return <PremiumLoader fullPage text="Locating Folder..." />;
     }
 
     if (!folder) {
@@ -168,7 +188,7 @@ export const FolderDetail: React.FC = () => {
                     ← Back
                 </button>
                 <div className="action-group">
-                    {!analysisData && threads.length > 0 && (
+                    {threads.length > 0 && (
                         <button
                             className="btn-primary analyze-btn"
                             onClick={handleAnalyze}
@@ -176,11 +196,11 @@ export const FolderDetail: React.FC = () => {
                         >
                             {isAnalyzing ? (
                                 <>
-                                    <span className="spinner-small"></span>
+                                    <ButtonLoader />
                                     {loadingMsg}
                                 </>
                             ) : (
-                                <>✨ Analyze with AI</>
+                                <>{analyses.length > 0 ? "✨ Re-Analyze Folder" : "✨ Analyze with AI"}</>
                             )}
                         </button>
                     )}
@@ -209,20 +229,44 @@ export const FolderDetail: React.FC = () => {
                 </div>
             )}
 
-            {analysisData && (
-                <div className="analysis-wrapper">
-                    <AnalysisResults
-                        data={analysisData}
-                        onCitationClick={(id) => handleCitationClick(id)}
-                    />
-                    <div className="analysis-divider">
-                        <span>👇 Source Threads 👇</span>
-                    </div>
+            {analyses.length > 0 && (
+                <div className="analysis-feed">
+                    {analyses.map((analysis, index) => (
+                        <div key={analysis.id || index} className="analysis-wrapper">
+                            <details className="report-collapsible" open={index === 0}>
+                                <summary className="report-summary">
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        📊 AI Intelligence Report
+                                        {analysis.createdAt && (
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 400, opacity: 0.8 }}>
+                                                — {new Date(analysis.createdAt).toLocaleString()}
+                                            </span>
+                                        )}
+                                        {index === 0 && <span className="badge-new" style={{ fontSize: '0.7rem', background: 'var(--bg-accent)', color: 'white', padding: '2px 8px', borderRadius: '10px' }}>LATEST</span>}
+                                    </span>
+                                    <span className="report-hint">
+                                        {index === 0 ? "(Expanded)" : "(Click to view history)"}
+                                    </span>
+                                </summary>
+                                <div className="report-content">
+                                    <AnalysisResults
+                                        data={analysis}
+                                        onCitationClick={(id) => handleCitationClick(id)}
+                                    />
+                                </div>
+                            </details>
+                            {index === 0 && (
+                                <div className="analysis-divider">
+                                    <span>👇 Source Threads 👇</span>
+                                </div>
+                            )}
+                        </div>
+                    ))}
                 </div>
             )}
 
             {loading ? (
-                <div className="loading-folders">Loading threads...</div>
+                <PremiumLoader text="Retrieving Saved Threads..." />
             ) : threads.length === 0 ? (
                 <div className="empty-state">
                     <p>No threads saved yet.</p>

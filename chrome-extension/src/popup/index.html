@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OmniResearch</title>
+    <link rel="stylesheet" href="popup.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <h1>OmniResearch</h1>
+        <div class="status-badge" id="page-status">Detecting page...</div>
+    </header>
+
+    <div class="glass-card" id="login-required" style="display: none; text-align: center;">
+        <div class="section-title">Auth Required</div>
+        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">
+            Please <strong>Sign Up</strong> or <strong>Login</strong> to our web dashboard to sync your extractions.
+        </p>
+        <button id="login-btn" class="primary-btn">Go to Dashboard</button>
+    </div>
+
+    <div class="glass-card" id="extraction-card">
+        <div class="form-group">
+            <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                Save to Folder
+                <button id="add-folder-toggle" class="icon-btn" title="New Folder">+</button>
+            </div>
+            <div id="new-folder-input-group" style="display: none; margin-bottom: 10px;">
+                <input type="text" id="new-folder-name" placeholder="Folder name..." class="glass-input">
+                <button id="create-folder-btn" class="secondary-btn">Create</button>
+            </div>
+            <select id="folder-select">
+                <option value="default">Default Inbox</option>
+            </select>
+        </div>
+
+        <div id="snapshot-preview" class="snapshot-preview" style="display: none;">
+            <span class="snapshot-title" id="preview-title">Loading...</span>
+            <p class="snapshot-snip" id="preview-snippet"></p>
+        </div>
+
+        <div class="btn-group" style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <button id="extract-only-btn" class="secondary-btn" title="Sync to Cloud" disabled>Save & Keep
+                Browsing</button>
+            <button id="extract-analyse-btn" class="primary-btn" title="Deep AI Analysis" disabled>Save & Analyse
+                →</button>
+        </div>
+
+        <div style="margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px;">
+            <button id="copy-gpt-btn" class="secondary-btn"
+                style="background: rgba(46, 204, 113, 0.1); border-color: rgba(46, 204, 113, 0.2); color: #2ecc71;"
+                disabled>
+                📋 Copy for AI (Free)
+            </button>
+        </div>
+        <p id="error-message"></p>
+    </div>
+
+    <div class="glass-card" id="history-section" style="display: none;">
+        <div class="section-title">Cloud Extractions</div>
+        <div class="history-list" id="history-list">
+            <p style="font-size: 0.7rem; color: var(--text-secondary); text-align: center; padding: 10px;">
+                Checking cloud sync...
+            </p>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

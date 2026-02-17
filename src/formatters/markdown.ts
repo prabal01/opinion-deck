@@ -35,7 +35,7 @@ function renderComment(comment: Comment, indent: number = 0): string {
     const modBadge = comment.distinguished === "moderator" ? " **[MOD]**" : "";
     const stickyBadge = comment.stickied ? " 📌" : "";
 
-    const header = `${prefix}**u/${comment.author}** (↑ ${comment.score}) — *${relativeTime(comment.createdUtc)}*${opBadge}${modBadge}${stickyBadge}`;
+    const header = `${prefix}**${comment.author}** (↑ ${comment.score}) — *${relativeTime(comment.createdUtc)}*${opBadge}${modBadge}${stickyBadge}`;
 
     // Indent the body to align with the list item
     const bodyIndent = "  ".repeat(indent) + "  ";
@@ -60,11 +60,16 @@ function renderComment(comment: Comment, indent: number = 0): string {
 export function formatAsMarkdown(thread: ThreadData): string {
     const { post, comments, metadata } = thread;
 
+    // Safety guard for malformed data from bridge
+    if (!post) {
+        return "ERROR: Thread data is missing post information.";
+    }
+
     let md = "";
 
     // Post header
     md += `# ${post.title}\n\n`;
-    md += `**r/${post.subreddit}** • Posted by u/${post.author} • ${post.score} points (${Math.round(post.upvoteRatio * 100)}% upvoted) • ${formatDate(post.createdUtc)}\n\n`;
+    md += `**${post.subreddit}** • Posted by ${post.author} • ${post.score} points (${Math.round(post.upvoteRatio * 100)}% upvoted) • ${formatDate(post.createdUtc)}\n\n`;
 
     // Flair / badges
     const badges: string[] = [];
@@ -101,7 +106,7 @@ export function formatAsMarkdown(thread: ThreadData): string {
 
     // Footer
     md += "\n---\n\n";
-    md += `*Fetched by reddit-dl v${metadata.toolVersion} at ${metadata.fetchedAt}*\n`;
+    md += `*Fetched by OmniResearch v${metadata.toolVersion} at ${metadata.fetchedAt}*\n`;
     md += `*Source: ${post.permalink}*\n`;
 
     return md;

@@ -32,6 +32,8 @@ interface AuthContextType {
     signOut: () => Promise<void>;
     refreshPlan: () => Promise<void>;
     getIdToken: () => Promise<string | null>;
+    userStats: any | null;
+    refreshStats: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -45,11 +47,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const firebaseConfigured = !!auth;
 
+    const [userStats, setUserStats] = useState<any | null>(null);
+
     // Fetch plan from server
     const fetchPlan = useCallback(async (fbUser: User | null) => {
         if (!fbUser) {
             setPlan(null);
             setConfig(null);
+            setUserStats(null);
             return;
         }
 
@@ -65,6 +70,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         } catch (err) {
             console.error("Failed to fetch plan:", err);
+        }
+    }, []);
+
+    const fetchStats = useCallback(async (fbUser: User | null) => {
+        if (!fbUser) return;
+        try {
+            const token = await fbUser.getIdToken();
+            const res = await fetch("/api/user/stats", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+                const stats = await res.json();
+                setUserStats(stats);
+            }
+        } catch (err) {
+            console.error("Failed to fetch stats:", err);
         }
     }, []);
 
@@ -85,17 +106,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     photoURL: fbUser.photoURL,
                 });
                 await fetchPlan(fbUser);
+                await fetchStats(fbUser);
             } else {
                 setFirebaseUser(null);
                 setUser(null);
                 setPlan(null);
                 setConfig(null);
+                setUserStats(null);
             }
             setLoading(false);
         });
 
         return unsubscribe;
-    }, [fetchPlan]);
+    }, [fetchPlan, fetchStats]);
+
+    // ── Extension Auth Sync ─────────────────────────────────────────────
+    useEffect(() => {
+        const syncTokenToExtension = async () => {
+            if (!firebaseUser) {
+                // Send null token to clear extension state on logout
+                window.postMessage({ type: "OMNI_RESEARCH_AUTH_TOKEN", token: null }, window.location.origin);
+                return;
+            }
+
+            try {
+                const token = await firebaseUser.getIdToken();
+                window.postMessage({ type: "OMNI_RESEARCH_AUTH_TOKEN", token }, window.location.origin);
+            } catch (err) {
+                console.error("Failed to sync token to extension:", err);
+            }
+        };
+
+        const handleExtensionMessage = async (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
+            if (event.data && event.data.type === "OMNI_EXTENSION_READY") {
+                console.log("[Web] Extension ready signal received. Syncing token...");
+                await syncTokenToExtension();
+            }
+        };
+
+        window.addEventListener("message", handleExtensionMessage);
+        // Also sync immediately when user changes (login/logout)
+        syncTokenToExtension();
+
+        return () => window.removeEventListener("message", handleExtensionMessage);
+    }, [firebaseUser]);
 
     const signInWithGoogle = useCallback(async () => {
         if (!auth || !googleProvider) {
@@ -119,15 +174,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setPlan(null);
         setConfig(null);
+        setUserStats(null);
     }, []);
 
     const refreshPlan = useCallback(async () => {
         await fetchPlan(firebaseUser);
     }, [firebaseUser, fetchPlan]);
 
+    const refreshStats = useCallback(async () => {
+        await fetchStats(firebaseUser);
+    }, [firebaseUser, fetchStats]);
+
     const getIdToken = useCallback(async (): Promise<string | null> => {
         if (!firebaseUser) return null;
-        return firebaseUser.getIdToken(true);
+        return firebaseUser.getIdToken(false); // Changed from true to false to stop forcing refresh
     }, [firebaseUser]);
 
     return (
@@ -142,6 +202,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 signOut: signOutUser,
                 refreshPlan,
                 getIdToken,
+                userStats,
+                refreshStats
             }}
         >
             {children}
