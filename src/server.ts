@@ -311,7 +311,7 @@ app.delete("/api/folders/:id", async (req: express.Request, res: express.Respons
         return;
     }
     try {
-        await deleteFolder(req.user.uid, req.params.id);
+        await deleteFolder(req.user.uid, req.params.id as string);
         res.json({ success: true });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
@@ -331,7 +331,7 @@ app.post("/api/folders/:id/threads", async (req: express.Request, res: express.R
         return;
     }
     try {
-        await saveThreadToFolder(req.user.uid, req.params.id, threadData);
+        await saveThreadToFolder(req.user.uid, req.params.id as string, threadData);
         res.json({ success: true });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
@@ -344,7 +344,7 @@ app.get("/api/folders/:id/threads", async (req: express.Request, res: express.Re
         return;
     }
     try {
-        const threads = await getThreadsInFolder(req.user.uid, req.params.id);
+        const threads = await getThreadsInFolder(req.user.uid, req.params.id as string);
         res.json(threads);
     } catch (err: any) {
         res.status(500).json({ error: err.message });
@@ -361,11 +361,11 @@ app.post("/api/folders/:id/analyze", async (req: express.Request, res: express.R
 
     try {
         // 1. Fetch folder details for context
-        const folder = await getFolder(req.user.uid, req.params.id);
+        const folder = await getFolder(req.user.uid, req.params.id as string);
         const folderContext = folder?.description || "";
 
         // 2. Fetch all threads in folder
-        const savedThreads = await getThreadsInFolder(req.user.uid, req.params.id);
+        const savedThreads = await getThreadsInFolder(req.user.uid, req.params.id as string);
 
         if (savedThreads.length === 0) {
             res.status(400).json({ error: "Folder is empty" });
@@ -393,7 +393,7 @@ app.post("/api/folders/:id/analyze", async (req: express.Request, res: express.R
         parsedResult.createdAt = new Date().toISOString();
 
         // Save to Firestore (Fire & Forget)
-        saveAnalysis(req.user.uid, req.params.id, parsedResult, "gemini-flash-latest");
+        saveAnalysis(req.user.uid, req.params.id as string, parsedResult, "gemini-flash-latest");
 
         // Deduct Credit (Increment Usage)
         await updateStats(req.user.uid, {
@@ -423,7 +423,7 @@ app.get("/api/folders/:id/analysis", async (req: express.Request, res: express.R
         return;
     }
     try {
-        const analyses = await getFolderAnalyses(req.user.uid, req.params.id);
+        const analyses = await getFolderAnalyses(req.user.uid, req.params.id as string);
         // Flatten the structure for the frontend
         const flattened = analyses.map(a => ({
             ...a.data,
