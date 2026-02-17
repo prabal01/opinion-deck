@@ -1,7 +1,7 @@
 "use strict";
 (() => {
   // chrome-extension/src/content/twitter.ts
-  console.log("[OmniResearch] Twitter/X Extractor Loaded");
+  console.log("[OpinionDeck] Twitter/X Extractor Loaded");
   async function extractTwitterThread() {
     const url = window.location.href;
     try {
@@ -58,7 +58,7 @@
         isAnalyzed: false
       };
     } catch (err) {
-      console.error("[OmniResearch] Twitter Extraction Failed", err);
+      console.error("[OpinionDeck] Twitter Extraction Failed", err);
       return {
         id: `twitter_fallback_${Date.now()}`,
         source: "twitter",

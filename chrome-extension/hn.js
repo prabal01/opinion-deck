@@ -2,6 +2,10 @@
 (() => {
     function extractHNThread() {
         var _a, _b, _c, _d;
+        /**
+         * HackerNews DOM Extractor
+         * Maps HN thread structure to the OpinionDeck schema.
+         */
         const title = ((_a = document.querySelector(".titleline a")) == null ? void 0 : _a.textContent) || "";
         const author = ((_b = document.querySelector(".hnuser")) == null ? void 0 : _b.textContent) || "";
         const scoreText = ((_c = document.querySelector(".score")) == null ? void 0 : _c.textContent) || "0";

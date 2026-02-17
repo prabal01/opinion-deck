@@ -1,5 +1,5 @@
 /// <reference types="chrome"/>
-console.log('[OmniResearch] Reddit Extractor Loaded');
+console.log("[OpinionDeck] Reddit Extractor Loaded");
 
 async function extractRedditThread() {
     const url = window.location.href;
@@ -69,7 +69,7 @@ async function extractRedditThread() {
             isAnalyzed: false
         };
     } catch (err) {
-        console.error("[OmniResearch] JSON Extraction Failed, falling back to basic scrape", err);
+        console.error("[OpinionDeck] JSON Extraction Failed, falling back to basic scrape", err);
         return {
             id: `reddit_fallback_${Date.now()}`,
             source: 'reddit',

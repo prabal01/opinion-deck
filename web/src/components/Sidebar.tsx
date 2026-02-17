@@ -15,7 +15,7 @@ export const Sidebar: React.FC = () => {
         <aside className="sidebar">
             <div className="sidebar-header">
                 <div className="sidebar-logo" onClick={handleLogoClick}>
-                    <span className="logo-icon">📡</span>
+                    <img src="/logo.svg" className="logo-icon" alt="OpinionDeck Logo" style={{ width: '36px', height: '36px' }} />
                     <h1>{BRANDING.NAME}</h1>
                 </div>
             </div>

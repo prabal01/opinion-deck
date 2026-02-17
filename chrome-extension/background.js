@@ -2,12 +2,12 @@
 (() => {
   // chrome-extension/src/background.ts
   chrome.runtime.onInstalled.addListener(() => {
-    console.log("[OmniResearch] Extension Installed");
+    console.log("[OpinionDeck] Extension Installed");
   });
   async function saveToBackend(data) {
-    const API_URL = "http://localhost:3001/api/extractions";
-    const authRecord = await chrome.storage.local.get("omni_auth_token");
-    const token = authRecord.omni_auth_token;
+    const API_URL = "https://opinion-deck.onrender.com/api/extractions";
+    const authRecord = await chrome.storage.local.get("opinion_deck_token");
+    const token = authRecord.opinion_deck_token;
     try {
       const response = await fetch(API_URL, {
         method: "POST",
@@ -54,7 +54,7 @@
           return true;
         }
         const algoliaUrl = `https://hn.algolia.com/api/v1/items/${hnId}`;
-        console.log("[OmniResearch] HN Remote Fetch:", algoliaUrl);
+        console.log("[OpinionDeck] HN Remote Fetch:", algoliaUrl);
         fetch(algoliaUrl).then(async (response) => {
           if (!response.ok) throw new Error(`HN/Algolia error: ${response.status}`);
           const data = await response.json();
@@ -69,7 +69,7 @@
           };
           sendResponse({ status: "success", data: [{ data: { children: [{ data: normalized }] } }] });
         }).catch((err) => {
-          console.error("[OmniResearch] HN Remote Fetch Failed:", err);
+          console.error("[OpinionDeck] HN Remote Fetch Failed:", err);
           sendResponse({ status: "error", error: err.message });
         });
         return true;
@@ -77,12 +77,12 @@
       if (url.includes("twitter.com") || url.includes("x.com")) {
         sendResponse({
           status: "error",
-          error: "Twitter extraction requires the OmniResearch extension to be active on that tab. Please open the X/Twitter thread directly and use the extension popup."
+          error: "Twitter extraction requires the OpinionDeck extension to be active on that tab. Please open the X/Twitter thread directly and use the extension popup."
         });
         return true;
       }
       const jsonUrl = url.includes(".json") ? url : (url.endsWith("/") ? url.slice(0, -1) : url) + ".json";
-      console.log("[OmniResearch] Remote Fetching:", jsonUrl);
+      console.log("[OpinionDeck] Remote Fetching:", jsonUrl);
       fetch(jsonUrl).then(async (response) => {
         const contentType = response.headers.get("content-type");
         if (!response.ok) throw new Error(`Reddit error: ${response.status}`);
@@ -92,7 +92,7 @@
         const data = await response.json();
         sendResponse({ status: "success", data });
       }).catch((err) => {
-        console.error("[OmniResearch] Remote Fetch Failed:", err);
+        console.error("[OpinionDeck] Remote Fetch Failed:", err);
         sendResponse({ status: "error", error: err.message });
       });
       return true;

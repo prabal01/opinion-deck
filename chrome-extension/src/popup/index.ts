@@ -2,8 +2,8 @@
 import { ExtractedData } from '../types';
 
 async function checkAuth() {
-    const authRecord = await chrome.storage.local.get('omni_auth_token');
-    const token = authRecord.omni_auth_token;
+    const authRecord = await chrome.storage.local.get('opinion_deck_token');
+    const token = authRecord.opinion_deck_token;
     const loginSection = document.getElementById('login-required');
     const extractionSection = document.getElementById('extraction-card');
     const historySection = document.getElementById('history-section');
@@ -37,7 +37,7 @@ async function updateHistory() {
 
     // Fetch from Server instead of Local DB
     try {
-        const response = await fetch('http://localhost:3001/api/extractions', {
+        const response = await fetch('https://opinion-deck.onrender.com/api/extractions', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!response.ok) throw new Error('Failed to fetch from dashboard');
@@ -56,7 +56,7 @@ async function updateHistory() {
         </div>
       `).join('') + (extractions.length > 5 ? `
         <div style="text-align: center; margin-top: 10px;">
-          <a href="http://localhost:5173" target="_blank" style="color: #6366f1; font-size: 0.75rem; text-decoration: none; font-weight: 500;">View All in Dashboard →</a>
+          <a href="https://app.opiniondeck.com" target="_blank" style="color: #6366f1; font-size: 0.75rem; text-decoration: none; font-weight: 500;">View All in Dashboard →</a>
         </div>
       ` : '') || '<p style="font-size: 0.7rem; color: #666;">No extractions yet.</p>';
 
@@ -66,7 +66,7 @@ async function updateHistory() {
             if (item) {
                 const folderId = item.dataset.folderId;
                 const threadId = item.dataset.id;
-                const url = `http://localhost:5173/folders/${folderId}/threads/${threadId}`;
+                const url = `https://app.opiniondeck.com/folders/${folderId}/threads/${threadId}`;
                 chrome.tabs.create({ url });
             }
         });
@@ -83,7 +83,7 @@ async function fetchFolders() {
     if (!token) return;
 
     try {
-        const response = await fetch('http://localhost:3001/api/folders', {
+        const response = await fetch('https://opinion-deck.onrender.com/api/folders', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!response.ok) return;
@@ -120,13 +120,16 @@ function detectPage(url: string) {
             else if (url.includes('x.com') || url.includes('twitter.com')) statusEl.innerText = 'Twitter/X Thread Detected';
             statusEl.classList.add('status-active');
         }
-        chrome.storage.local.get('omni_auth_token').then(record => {
-            if (record.omni_auth_token) {
+
+        // Always enable copy button for supported pages
+        if (copyGptBtn) copyGptBtn.disabled = false;
+
+        chrome.storage.local.get('opinion_deck_token').then(record => {
+            if (record.opinion_deck_token) {
                 if (saveOnlyBtn) saveOnlyBtn.disabled = false;
                 if (saveAnalyseBtn) saveAnalyseBtn.disabled = false;
             }
         });
-        if (copyGptBtn) copyGptBtn.disabled = false;
 
         if (url.includes('reddit')) return 'reddit';
         if (url.includes('g2.com')) return 'g2';
@@ -189,7 +192,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         createFolderBtn.innerText = '...';
         try {
-            const response = await fetch('http://localhost:3001/api/folders', {
+            const response = await fetch('https://opinion-deck.onrender.com/api/folders', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -225,7 +228,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await updateHistory();
 
     document.getElementById('login-btn')?.addEventListener('click', () => {
-        chrome.tabs.create({ url: 'http://localhost:5173' });
+        chrome.tabs.create({ url: 'https://app.opiniondeck.com' });
     });
 
     const performSave = async (shouldRedirect: boolean) => {
@@ -264,7 +267,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (shouldRedirect) {
                         // Redirect to the deep-linked thread view
                         const fid = folderId === 'default' ? 'inbox' : folderId;
-                        const dashboardUrl = `http://localhost:5173/folders/${fid}/threads/${response.data.id}`;
+                        const dashboardUrl = `https://app.opiniondeck.com/folders/${fid}/threads/${response.data.id}`;
                         chrome.tabs.create({ url: dashboardUrl });
                     }
                 } else {

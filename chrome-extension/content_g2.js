@@ -1,7 +1,7 @@
 "use strict";
 (() => {
   // chrome-extension/src/content/g2.ts
-  console.log("[OmniResearch] G2 Extractor Loaded");
+  console.log("[OpinionDeck] G2 Extractor Loaded");
   function extractG2Reviews() {
     const title = document.querySelector("h1")?.innerText || document.title;
     const url = window.location.href;

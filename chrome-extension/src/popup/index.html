@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniResearch</title>
+    <title>OpinionDeck</title>
     <link rel="stylesheet" href="popup.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,9 +12,10 @@
 </head>
 
 <body>
-    <header>
-        <h1>OmniResearch</h1>
-        <div class="status-badge" id="page-status">Detecting page...</div>
+    <header style="display: flex; align-items: center; gap: 10px; padding: 15px;">
+        <img src="../../icons/logo.svg" alt="logo" style="width: 28px; height: 28px;">
+        <h1 style="margin: 0;">OpinionDeck <span
+                style="font-size: 0.6em; opacity: 0.6; vertical-align: middle;">BETA</span></h1>
     </header>
 
     <div class="glass-card" id="login-required" style="display: none; text-align: center;">
@@ -71,7 +72,7 @@
         </div>
     </div>
 
-    <script src="popup.js"></script>
+    <script type="module" src="index.ts"></script>
 </body>
 
 </html>

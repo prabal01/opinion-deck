@@ -125,13 +125,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const syncTokenToExtension = async () => {
             if (!firebaseUser) {
                 // Send null token to clear extension state on logout
-                window.postMessage({ type: "OMNI_RESEARCH_AUTH_TOKEN", token: null }, window.location.origin);
+                window.postMessage({ type: "OPINION_DECK_AUTH_TOKEN", token: null }, window.location.origin);
                 return;
             }
 
             try {
                 const token = await firebaseUser.getIdToken();
-                window.postMessage({ type: "OMNI_RESEARCH_AUTH_TOKEN", token }, window.location.origin);
+                window.postMessage({ type: "OPINION_DECK_AUTH_TOKEN", token }, window.location.origin);
             } catch (err) {
                 console.error("Failed to sync token to extension:", err);
             }
@@ -139,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const handleExtensionMessage = async (event: MessageEvent) => {
             if (event.origin !== window.location.origin) return;
-            if (event.data && event.data.type === "OMNI_EXTENSION_READY") {
+            if (event.data && event.data.type === "OPINION_DECK_EXTENSION_READY") {
                 console.log("[Web] Extension ready signal received. Syncing token...");
                 await syncTokenToExtension();
             }

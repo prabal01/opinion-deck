@@ -1,8 +1,11 @@
 /// <reference types="chrome"/>
 
+// chrome-extension/src/content/hn.ts
+console.log("[OpinionDeck] HackerNews Extractor Loaded");
+
 /**
  * HackerNews DOM Extractor
- * Maps HN thread structure to the OmniResearch schema.
+ * Maps HN thread structure to the OpinionDeck schema.
  */
 
 function extractHNThread() {

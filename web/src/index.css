@@ -185,7 +185,8 @@ a:hover {
 }
 
 .sidebar-logo .logo-icon {
-    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
 }
 
 .sidebar-logo h1 {
@@ -294,7 +295,8 @@ a:hover {
 }
 
 .logo-icon {
-    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
 }
 
 .logo-text {

@@ -1,15 +1,15 @@
 /// <reference types="chrome"/>
 
 chrome.runtime.onInstalled.addListener(() => {
-    console.log('[OmniResearch] Extension Installed');
+    console.log('[OpinionDeck] Extension Installed');
 });
 
 // Helper to save to backend
 async function saveToBackend(data: any) {
-    const API_URL = 'http://localhost:3001/api/extractions';
+    const API_URL = 'https://opinion-deck.onrender.com/api/extractions';
 
-    const authRecord = await chrome.storage.local.get('omni_auth_token');
-    const token = authRecord.omni_auth_token;
+    const authRecord = await chrome.storage.local.get('opinion_deck_token');
+    const token = authRecord.opinion_deck_token;
 
     try {
         const response = await fetch(API_URL, {
@@ -69,7 +69,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
 
             const algoliaUrl = `https://hn.algolia.com/api/v1/items/${hnId}`;
-            console.log('[OmniResearch] HN Remote Fetch:', algoliaUrl);
+            console.log('[OpinionDeck] HN Remote Fetch:', algoliaUrl);
 
             fetch(algoliaUrl)
                 .then(async response => {
@@ -90,7 +90,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     sendResponse({ status: 'success', data: [{ data: { children: [{ data: normalized }] } }] });
                 })
                 .catch(err => {
-                    console.error('[OmniResearch] HN Remote Fetch Failed:', err);
+                    console.error('[OpinionDeck] HN Remote Fetch Failed:', err);
                     sendResponse({ status: 'error', error: err.message });
                 });
             return true;
@@ -100,7 +100,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (url.includes('twitter.com') || url.includes('x.com')) {
             sendResponse({
                 status: 'error',
-                error: 'Twitter extraction requires the OmniResearch extension to be active on that tab. Please open the X/Twitter thread directly and use the extension popup.'
+                error: 'Twitter extraction requires the OpinionDeck extension to be active on that tab. Please open the X/Twitter thread directly and use the extension popup.'
             });
             return true;
         }
@@ -109,7 +109,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // Construct .json URL
         const jsonUrl = url.includes('.json') ? url : (url.endsWith('/') ? url.slice(0, -1) : url) + '.json';
 
-        console.log('[OmniResearch] Remote Fetching:', jsonUrl);
+        console.log('[OpinionDeck] Remote Fetching:', jsonUrl);
 
         fetch(jsonUrl)
             .then(async response => {
@@ -122,7 +122,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 sendResponse({ status: 'success', data });
             })
             .catch(err => {
-                console.error('[OmniResearch] Remote Fetch Failed:', err);
+                console.error('[OpinionDeck] Remote Fetch Failed:', err);
                 sendResponse({ status: 'error', error: err.message });
             });
         return true;

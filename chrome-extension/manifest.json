@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "OmniResearch Extractor",
+    "name": "OpinionDeck Extractor (BETA)",
     "version": "1.0.0",
-    "description": "Extract insights from Reddit, G2, and more.",
+    "description": "Strategic market intelligence from Reddit, G2, and more.",
     "permissions": [
         "storage",
         "activeTab",
@@ -61,7 +61,7 @@
         {
             "matches": [
                 "http://localhost:5173/*",
-                "https://playlife2.com/*"
+                "https://app.opiniondeck.com/*"
             ],
             "js": [
                 "dashboard.js"

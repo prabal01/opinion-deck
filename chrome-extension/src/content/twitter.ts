@@ -1,6 +1,6 @@
 /// <reference types="chrome"/>
 /* eslint-disable @typescript-eslint/no-explicit-any */
-console.log('[OmniResearch] Twitter/X Extractor Loaded');
+console.log("[OpinionDeck] Twitter Extractor Loaded");
 
 async function extractTwitterThread() {
     const url = window.location.href;
@@ -64,7 +64,7 @@ async function extractTwitterThread() {
             isAnalyzed: false
         };
     } catch (err: any) {
-        console.error("[OmniResearch] Twitter Extraction Failed", err);
+        console.error("[OpinionDeck] Twitter Extraction Failed", err);
         return {
             id: `twitter_fallback_${Date.now()}`,
             source: 'twitter',

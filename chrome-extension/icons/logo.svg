@@ -11,6 +11,7 @@
   <rect x="42" y="62" width="116" height="82" rx="10" ry="10"
         fill="#FF6B00" opacity="1"/>
   <!-- Content lines in WHITE for high contrast - Centered Vertically -->
+  <!-- Card Y start 62, Height 82 -> Centered vertical range [80, 126] -->
   <line x1="58" y1="80"  x2="142" y2="80"  stroke="white" stroke-width="12" stroke-linecap="round"/>
   <line x1="58" y1="95" x2="128" y2="95" stroke="white" stroke-width="12" stroke-linecap="round" opacity="0.85"/>
   <line x1="58" y1="110" x2="135" y2="110" stroke="white" stroke-width="12" stroke-linecap="round" opacity="0.85"/>
