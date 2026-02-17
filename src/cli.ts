@@ -100,6 +100,9 @@ export function createCli(): Command {
 
             try {
                 // Fetch the thread
+                if (!urlInfo) {
+                    throw new Error("Failed to parse URL");
+                }
                 const thread = await fetchThread(
                     urlInfo,
                     options.sort,
