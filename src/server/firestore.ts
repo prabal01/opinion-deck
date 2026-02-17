@@ -8,23 +8,53 @@ let db: Firestore;
 let auth: Auth;
 
 export function initFirebase(): void {
-    const saPath = process.env.FIREBASE_SERVICE_ACCOUNT || "./service-account.json";
-    const resolved = path.resolve(saPath);
+    const firebaseServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+    let serviceAccount: ServiceAccount | null = null;
 
-    if (!fs.existsSync(resolved)) {
-        console.warn(
-            `⚠️  Firebase service account not found at ${resolved}. Auth & Firestore disabled.`
-        );
-        return;
+    if (firebaseServiceAccount) {
+        // Check if it's a JSON string or a path
+        if (firebaseServiceAccount.trim().startsWith('{')) {
+            try {
+                serviceAccount = JSON.parse(firebaseServiceAccount);
+            } catch (err) {
+                console.error("❌ Failed to parse FIREBASE_SERVICE_ACCOUNT JSON from environment.");
+            }
+        } else {
+            const resolved = path.resolve(firebaseServiceAccount);
+            if (fs.existsSync(resolved)) {
+                try {
+                    serviceAccount = JSON.parse(fs.readFileSync(resolved, "utf-8"));
+                } catch (err) {
+                    console.error(`❌ Failed to parse service-account.json at ${resolved}`);
+                }
+            } else {
+                console.warn("⚠️ Firebase service account file not found. Auth & Firestore disabled.");
+            }
+        }
+    } else {
+        // Fallback to local file
+        const defaultPath = path.resolve("./service-account.json");
+        if (fs.existsSync(defaultPath)) {
+            try {
+                serviceAccount = JSON.parse(fs.readFileSync(defaultPath, "utf-8"));
+            } catch (err) {
+                console.error("❌ Failed to parse default service-account.json");
+            }
+        } else {
+            console.warn("⚠️ FIREBASE_SERVICE_ACCOUNT env var not set and local service-account.json missing.");
+        }
     }
 
-    const serviceAccount = JSON.parse(
-        fs.readFileSync(resolved, "utf-8")
-    ) as ServiceAccount;
-
-    initializeApp({ credential: cert(serviceAccount) });
-    db = getFirestore();
-    auth = getAuth();
+    if (serviceAccount) {
+        try {
+            initializeApp({ credential: cert(serviceAccount) });
+            db = getFirestore();
+            auth = getAuth();
+            console.log("✅ Firebase initialized successfully.");
+        } catch (err: any) {
+            console.error("❌ Firebase initialization failed:", err.message);
+        }
+    }
 }
 
 export function getDb(): Firestore {

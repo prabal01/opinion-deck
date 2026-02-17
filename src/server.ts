@@ -245,7 +245,7 @@ app.get("/api/user/plan", async (req: express.Request, res: express.Response) =>
         });
     } catch (err: any) {
         console.error("GET /api/user/plan - Fatal Error:", err);
-        res.status(500).json({ error: err.message, stack: err.stack });
+        res.status(500).json({ error: "Internal Server Error" });
     }
 });
 

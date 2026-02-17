@@ -4,7 +4,7 @@ import { ExtractedData } from '../types';
 async function checkAuth() {
     const authRecord = await chrome.storage.local.get('opinion_deck_token');
     const token = authRecord.opinion_deck_token;
-    console.log("[OpinionDeck Popup] Storage Token Check:", token ? "Found (length " + token.length + ")" : "NOT FOUND");
+
 
     const loginSection = document.getElementById('login-required');
     const extractionSection = document.getElementById('extraction-card');
@@ -253,7 +253,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await updateHistory();
 
         const finalCheck = await chrome.storage.local.get('opinion_deck_token');
-        console.log("[OpinionDeck Popup] Refresh Cycle Complete. Final Token:", finalCheck.opinion_deck_token ? "PRESENT" : "MISSING");
+
 
 
         setTimeout(() => {
