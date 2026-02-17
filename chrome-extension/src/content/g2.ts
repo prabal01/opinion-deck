@@ -40,8 +40,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === 'GET_METADATA') {
-        const title = document.querySelector('h1')?.innerText || document.title;
-        const snippet = document.querySelector('.product-head__description')?.innerText || '';
+        const title = document.querySelector('h1')?.textContent || document.title;
+        const snippet = (document.querySelector('.product-head__description') as HTMLElement)?.innerText || '';
         sendResponse({ title, snippet });
     }
     return true;

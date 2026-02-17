@@ -13,7 +13,8 @@ import {
     type User,
 } from "firebase/auth";
 import { auth, googleProvider } from "../lib/firebase";
-import type { PlanConfig } from "../lib/api";
+import { API_BASE, type PlanConfig } from "../lib/api";
+
 
 interface AuthUser {
     uid: string;
@@ -60,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         try {
             const token = await fbUser.getIdToken();
-            const res = await fetch("/api/user/plan", {
+            const res = await fetch(`${API_BASE}/user/plan`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (res.ok) {
@@ -77,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!fbUser) return;
         try {
             const token = await fbUser.getIdToken();
-            const res = await fetch("/api/user/stats", {
+            const res = await fetch(`${API_BASE}/user/stats`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (res.ok) {

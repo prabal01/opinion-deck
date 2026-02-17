@@ -1,6 +1,9 @@
 import type { ThreadData } from "@core/reddit/types.js";
 
-const API_BASE = import.meta.env.VITE_API_URL || "/api";
+const rawApiBase = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
+export const API_BASE = rawApiBase.endsWith("/api") ? rawApiBase : `${rawApiBase}/api`;
+
+
 
 // ── Plan config type (matches server PlanConfig) ───────────────────
 
@@ -124,7 +127,8 @@ export async function createPortalSession(): Promise<string> {
 
 export async function fetchFolderAnalysis(folderId: string): Promise<any | null> {
     const headers = await getAuthHeaders();
-    const response = await fetch(`/api/folders/${folderId}/analysis`, {
+    const response = await fetch(`${API_BASE}/folders/${folderId}/analysis`, {
+
         method: "GET",
         headers,
     });

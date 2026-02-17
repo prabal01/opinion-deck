@@ -4,6 +4,8 @@ import { ExtractedData } from '../types';
 async function checkAuth() {
     const authRecord = await chrome.storage.local.get('opinion_deck_token');
     const token = authRecord.opinion_deck_token;
+    console.log("[OpinionDeck Popup] Storage Token Check:", token ? "Found (length " + token.length + ")" : "NOT FOUND");
+
     const loginSection = document.getElementById('login-required');
     const extractionSection = document.getElementById('extraction-card');
     const historySection = document.getElementById('history-section');
@@ -226,6 +228,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     await checkAuth(); // Ensure visibility is set immediately
     await fetchFolders();
     await updateHistory();
+
+    document.getElementById('refresh-auth-btn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('refresh-auth-btn') as HTMLButtonElement;
+        btn.style.animation = 'spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite';
+
+        // 1. Proactively ask any open dashboard tabs to re-sync their token
+        const dashboardTabs = await chrome.tabs.query({ url: '*://app.opiniondeck.com/*' });
+        const syncPromises = dashboardTabs.map(t => {
+            if (t.id) return chrome.tabs.sendMessage(t.id, { action: 'REQUEST_AUTH_SYNC' }).catch(() => { });
+            return Promise.resolve();
+        });
+        await Promise.all(syncPromises);
+
+        // 2. Wait for the round-trip (Dashboard tab -> Window -> Content Script -> Storage)
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        // 3. Re-detect page and refresh UI
+        const [currTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (currTab?.url) detectPage(currTab.url);
+
+        await checkAuth();
+        await fetchFolders();
+        await updateHistory();
+
+        const finalCheck = await chrome.storage.local.get('opinion_deck_token');
+        console.log("[OpinionDeck Popup] Refresh Cycle Complete. Final Token:", finalCheck.opinion_deck_token ? "PRESENT" : "MISSING");
+
+
+        setTimeout(() => {
+            btn.style.animation = 'none';
+        }, 100);
+    });
+
 
     document.getElementById('login-btn')?.addEventListener('click', () => {
         chrome.tabs.create({ url: 'https://app.opiniondeck.com' });
