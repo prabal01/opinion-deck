@@ -56,7 +56,7 @@ export function createCli(): Command {
             parseInt
         )
         .option("--token-count", "Show estimated token count", false)
-        .action(async (url: string, opts: any) => {
+        .action(async (url: string, opts: Record<string, any>) => {
             const options: CLIOptions = {
                 format: opts.format,
                 output: opts.output,

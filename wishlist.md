@@ -6,3 +6,4 @@
 
 - add crisp on dashboard and site
 - add posthog analytics - very important.
+- Add icons currently using emojis

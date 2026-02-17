@@ -266,8 +266,8 @@ export async function getFolders(uid: string): Promise<Folder[]> {
             .where("uid", "==", uid)
             .get();
         return snapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() } as Folder))
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            .map((doc: any) => ({ id: doc.id, ...doc.data() } as Folder))
+            .sort((a: Folder, b: Folder) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } catch (err) {
         console.error("Failed to get folders:", err);
         return [];
@@ -321,7 +321,7 @@ export async function deleteFolder(uid: string, folderId: string): Promise<void>
             .get();
 
         const batch = db.batch();
-        threads.docs.forEach(d => batch.delete(d.ref));
+        threads.docs.forEach((d: any) => batch.delete(d.ref));
         batch.delete(ref);
         await batch.commit();
     }
@@ -376,8 +376,8 @@ export async function getThreadsInFolder(uid: string, folderId: string): Promise
             .where("folderId", "==", folderId)
             .get();
         return snapshot.docs
-            .map(doc => doc.data() as SavedThread)
-            .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
+            .map((doc: any) => doc.data() as SavedThread)
+            .sort((a: SavedThread, b: SavedThread) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
     } catch (err) {
         console.error("Failed to get threads:", err);
         return [];
@@ -434,8 +434,8 @@ export async function getLatestAnalysis(uid: string, folderId: string): Promise<
         }
 
         // Sort in memory (descending by createdAt)
-        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AnalysisDoc));
-        docs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const docs = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as AnalysisDoc));
+        docs.sort((a: AnalysisDoc, b: AnalysisDoc) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
         const doc = docs[0];
         console.log(`[FIRESTORE] Found analysis: ${doc.id}`);
@@ -456,9 +456,9 @@ export async function getFolderAnalyses(uid: string, folderId: string): Promise<
 
         if (snapshot.empty) return [];
 
-        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AnalysisDoc));
+        const docs = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as AnalysisDoc));
         // Sort descending by date
-        return docs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        return docs.sort((a: AnalysisDoc, b: AnalysisDoc) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } catch (err) {
         console.error("Failed to get analyses:", err);
         return [];
@@ -528,7 +528,7 @@ export async function listExtractions(uid: string): Promise<ExtractedData[]> {
         .limit(50)
         .get();
 
-    return snapshot.docs.map(doc => doc.data() as ExtractedData);
+    return snapshot.docs.map((doc: any) => doc.data() as ExtractedData);
 }
 
 // ── User Statistics (Dashboard Metrics) ─────────────────────────────
