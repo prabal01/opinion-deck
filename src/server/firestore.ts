@@ -1,11 +1,13 @@
 import { initializeApp, cert, type ServiceAccount } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { getAuth, type Auth } from "firebase-admin/auth";
+import { getStorage, type Storage } from "firebase-admin/storage";
 import * as fs from "fs";
 import * as path from "path";
 
 let db: Firestore;
 let auth: Auth;
+let storage: Storage;
 
 export function initFirebase(): void {
     const firebaseServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -47,10 +49,15 @@ export function initFirebase(): void {
 
     if (serviceAccount) {
         try {
-            initializeApp({ credential: cert(serviceAccount) });
+            const BUCKET = process.env.FIREBASE_STORAGE_BUCKET || 'redditkeeperprod.appspot.com';
+            initializeApp({
+                credential: cert(serviceAccount),
+                storageBucket: BUCKET
+            });
             db = getFirestore();
             auth = getAuth();
-            console.log("✅ Firebase initialized successfully.");
+            storage = getStorage();
+            console.log("✅ Firebase initialized successfully with Storage.");
         } catch (err: any) {
             console.error("❌ Firebase initialization failed:", err.message);
         }
@@ -63,6 +70,10 @@ export function getDb(): Firestore {
 
 export function getAdminAuth(): Auth {
     return auth;
+}
+
+export function getAdminStorage(): Storage {
+    return storage;
 }
 
 // ── Plan Config types ──────────────────────────────────────────────
@@ -108,6 +119,7 @@ export interface SavedThread {
     author: string;
     subreddit: string;
     data: any; // Full thread JSON snapshot
+    storageUrl?: string; // Pointer to external storage
     savedAt: string;
 }
 
@@ -361,7 +373,7 @@ export async function deleteFolder(uid: string, folderId: string): Promise<void>
 
 export async function saveThreadToFolder(uid: string, folderId: string, threadData: any): Promise<void> {
     if (!db) {
-        console.log(`[MOCK] Save thread ${threadData.post.id} to folder ${folderId}`);
+        console.log(`[MOCK] Save thread to folder ${folderId}`);
         return;
     }
 
@@ -372,17 +384,21 @@ export async function saveThreadToFolder(uid: string, folderId: string, threadDa
         throw new Error("Folder not found or access denied");
     }
 
-    const threadId = threadData.post.id; // t3_...
+    // threadData might be the direct object or a stub with storageUrl
+    const threadId = threadData.id || threadData.post?.id;
+    if (!threadId) throw new Error("Invalid thread data: missing ID");
+
     const threadRef = db.collection("saved_threads").doc(`${folderId}_${threadId}`);
 
     const snapshot: SavedThread = {
         id: threadId,
         folderId,
         uid,
-        title: threadData.post.title,
-        author: threadData.post.author,
-        subreddit: threadData.post.subreddit,
-        data: threadData,
+        title: threadData.title || threadData.post?.title || "Untitled",
+        author: threadData.author || threadData.post?.author || "anonymous",
+        subreddit: threadData.subreddit || threadData.post?.subreddit || "r/unknown",
+        data: threadData.storageUrl ? null : threadData,
+        storageUrl: threadData.storageUrl || null,
         savedAt: new Date().toISOString(),
     };
 
@@ -531,6 +547,7 @@ export interface ExtractedData {
     url: string;
     title: string;
     content: any; // Raw platform-specific data
+    storageUrl?: string;
     extractedAt: string;
     folderId?: string;
     isAnalyzed: boolean;

@@ -12,7 +12,11 @@
     "start": "node dist/server.js",
     "dev:server": "npx tsx --watch src/server.ts",
     "dev:web": "cd web && npm run dev",
-    "dev": "npx concurrently \"npm run dev:server\" \"npm run dev:web\""
+    "dev": "npx concurrently \"npm run dev:server\" \"npm run dev:web\"",
+    "deploy:build": "docker build --platform linux/amd64 -t gcr.io/redditkeeperprod/opiniondeck-backend:latest .",
+    "deploy:push": "docker push gcr.io/redditkeeperprod/opiniondeck-backend:latest",
+    "deploy:run": "gcloud run deploy opiniondeck-backend --image gcr.io/redditkeeperprod/opiniondeck-backend:latest --platform managed --region us-east1 --allow-unauthenticated --env-vars-file env.yaml",
+    "deploy": "npm run deploy:build && npm run deploy:push && npm run deploy:run"
   },
   "keywords": [
     "reddit",
@@ -26,6 +30,10 @@
   "description": "Download complete Reddit threads (post + all comments) in AI-friendly formats",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.2.3",
+    "bullmq": "^5.69.3",
     "chalk": "^5.6.2",
     "clipboardy": "^5.3.0",
     "commander": "^14.0.3",
@@ -33,13 +41,10 @@
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "firebase-admin": "^13.6.1",
+    "ioredis": "^5.9.3",
     "ora": "^9.3.0",
     "p-queue": "^9.1.0",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.3",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/node": "^25.2.3"
-  },
-  "devDependencies": {}
+    "typescript": "^5.9.3"
+  }
 }

@@ -1,0 +1,35 @@
+name: Deploy Backend to Cloud Run
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'src/**'
+      - 'Dockerfile'
+      - 'package*.json'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Build and Push Container
+        run: |-
+          gcloud auth configure-docker --quiet
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/opiniondeck-backend:${{ github.sha }} .
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/opiniondeck-backend:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: opiniondeck-backend
+          image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/opiniondeck-backend:${{ github.sha }}
+          region: us-central1
+          flags: '--allow-unauthenticated --set-env-vars=NODE_ENV=production,ALLOWED_ORIGINS=https://app.opiniondeck.com,https://opiniondeck.com,https://www.opiniondeck.com'

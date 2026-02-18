@@ -1,17 +1,17 @@
 /// <reference types="chrome"/>
 import { ExtractedData } from '../types';
 
-const RENDER_API = 'https://opinion-deck.onrender.com/api';
-const PROD_DASHBOARD = 'https://app.opiniondeck.com';
+const FALLBACK_API = `${import.meta.env.VITE_API_URL}/api`;
+const FALLBACK_DASHBOARD = import.meta.env.VITE_DASHBOARD_URL;
 
 async function getApiBase() {
     const record = await chrome.storage.local.get('opinion_deck_api_url');
-    return record.opinion_deck_api_url || RENDER_API;
+    return record.opinion_deck_api_url || FALLBACK_API;
 }
 
 async function getDashboardBase() {
     const record = await chrome.storage.local.get('opinion_deck_dashboard_url');
-    return record.opinion_deck_dashboard_url || PROD_DASHBOARD;
+    return record.opinion_deck_dashboard_url || FALLBACK_DASHBOARD;
 }
 
 async function checkAuth() {
@@ -280,7 +280,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         btn.style.animation = 'spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite';
 
         // 1. Proactively ask any open dashboard tabs to re-sync their token
-        const dashboardTabs = await chrome.tabs.query({ url: '*://app.opiniondeck.com/*' });
+        const dashboardTabs = await chrome.tabs.query({ url: `${FALLBACK_DASHBOARD}/*` });
         const syncPromises = dashboardTabs.map(t => {
             if (t.id) return chrome.tabs.sendMessage(t.id, { action: 'REQUEST_AUTH_SYNC' }).catch(() => { });
             return Promise.resolve();

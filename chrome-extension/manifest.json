@@ -17,7 +17,7 @@
         "https://*.x.com/*",
         "https://*.twitter.com/*",
         "https://app.opiniondeck.com/*",
-        "https://opinion-deck.onrender.com/*",
+        "https://opiniondeck-backend-931114580004.us-east1.run.app/*",
         "http://localhost/*",
         "http://127.0.0.1/*"
     ],

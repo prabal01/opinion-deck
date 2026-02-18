@@ -2,21 +2,9 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import { default as PQueue } from "p-queue";
-import { parseRedditUrl, buildJsonUrl } from "./reddit/parser.js";
-import {
-    transformPost,
-    transformComment,
-    extractCommentsFromListing,
-    mergeIntoTree,
-    countComments,
-} from "./reddit/tree-builder.js";
+// Queue definitions removed (replaced by BullMQ)
+import { countComments } from "./reddit/tree-builder.js";
 import type {
-    RedditThing,
-    RedditListing,
-    RedditPostData,
-    RedditCommentData,
-    RedditMoreData,
     Comment,
 } from "./reddit/types.js";
 import {
@@ -38,6 +26,7 @@ import {
     getThreadsInFolder,
     saveAnalysis,
     getLatestAnalysis, getFolderAnalyses,
+    getAdminStorage
 } from "./server/firestore.js";
 import { analyzeThreads } from "./server/ai.js";
 
@@ -49,11 +38,26 @@ const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
 const TOOL_VERSION = "1.0.1";
 const RATE_LIMIT_DELAY = 1000;
 
+console.log("[INIT] Starting server.ts...");
+console.log(`[INIT] Node Version: ${process.version}`);
+console.log(`[INIT] PORT: ${PORT}`);
+
 // Initialize Firebase & Payments (non-blocking — app works without them)
-console.log("Initializing Firebase...");
-initFirebase();
-console.log("Initializing Payments...");
-initPayments();
+try {
+    console.log("[INIT] Initializing Firebase...");
+    initFirebase();
+    console.log("[INIT] Firebase initialization call complete.");
+} catch (err: any) {
+    console.error("[INIT] FATAL error during Firebase init:", err);
+}
+
+try {
+    console.log("[INIT] Initializing Payments...");
+    initPayments();
+    console.log("[INIT] Payments initialization complete.");
+} catch (err: any) {
+    console.error("[INIT] error during Payments init:", err);
+}
 
 process.on("unhandledRejection", (reason: unknown, promise: Promise<unknown>) => {
     console.error("Unhandled Rejection at:", promise, "reason:", reason);
@@ -63,25 +67,22 @@ process.on("uncaughtException", (err: Error) => {
     console.error("Uncaught Exception:", err);
 });
 
-// ── Request Queue (max 20 concurrent Reddit fetches) ───────────────
+// ── Request Queue & Diagnostics ───────────────────────────────────
 
-const fetchQueue = new PQueue({ concurrency: 20, timeout: 30_000 });
-
-// ── Analysis Queue (max 5 concurrent AI jobs) ─────────────────────
-
-const analysisQueue = new PQueue({ concurrency: 5, timeout: 60_000 });
-
-// ── Middleware ──────────────────────────────────────────────────────
+// Old p-queue based fetchQueue and analysisQueue removed.
+// Metrics should now track Redis queue sizes if needed.
 
 // CORS Configuration
 const allowedOrigins = [
     "http://localhost:5173",
     "http://localhost:4321",
-    "https://redditkeeperprod.web.app",
-    "https://opiniondeck-app.web.app",
-    "https://opiniondeck.com",
-    "https://www.opiniondeck.com",
-    "https://app.opiniondeck.com"
+    ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : [
+        "https://redditkeeperprod.web.app",
+        "https://opiniondeck-app.web.app",
+        "https://opiniondeck.com",
+        "https://www.opiniondeck.com",
+        "https://app.opiniondeck.com"
+    ])
 ];
 
 app.use(cors({
@@ -105,113 +106,12 @@ app.use(authMiddleware);
 
 // ── Helpers ────────────────────────────────────────────────────────
 
+// ── Helpers ────────────────────────────────────────────────────────
+
 function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchWithRetry(url: string, maxRetries = 3): Promise<any> {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            console.log(`[Fetch] Attempt ${attempt}/${maxRetries}: ${url}`);
-            const response = await fetch(url, {
-                headers: {
-                    "User-Agent": USER_AGENT,
-                    Accept: "application/json",
-                },
-            });
-
-            console.log(`[Fetch] Status: ${response.status} ${response.statusText}`);
-
-            if (response.status === 429) {
-                const retryAfter = parseInt(response.headers.get("retry-after") || "5");
-                await sleep(retryAfter * 1000);
-                continue;
-            }
-
-            if (response.status === 503 || response.status === 500) {
-                await sleep(Math.pow(2, attempt) * 1000);
-                continue;
-            }
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            return await response.json();
-        } catch (error: any) {
-            console.error(`[Fetch] Error on attempt ${attempt}:`, error.message);
-            if (attempt === maxRetries) {
-                throw new Error(`Failed after ${maxRetries} attempts: ${error.message}`);
-            }
-            await sleep(Math.pow(2, attempt) * 1000);
-        }
-    }
-}
-
-async function resolveMoreComments(
-    tree: Comment[],
-    moreIds: string[],
-    linkId: string,
-    maxBatches: number
-): Promise<void> {
-    const batchSize = 100;
-    let batchCount = 0;
-
-    for (let i = 0; i < moreIds.length; i += batchSize) {
-        if (maxBatches !== -1 && batchCount >= maxBatches) break;
-        batchCount++;
-
-        const batch = moreIds.slice(i, i + batchSize);
-        const childrenParam = batch.join(",");
-        const url = `https://www.reddit.com/api/morechildren.json?api_type=json&link_id=${linkId}&children=${childrenParam}`;
-
-        try {
-            const response = await fetchWithRetry(url);
-            if (response?.json?.data?.things) {
-                const things = response.json.data.things;
-                const newComments: Comment[] = [];
-
-                for (const thing of things) {
-                    if (thing.kind === "t1") {
-                        newComments.push(transformComment(thing.data));
-                    }
-                }
-
-                if (newComments.length > 0) {
-                    mergeIntoTree(tree, newComments);
-                }
-            }
-        } catch {
-            // Continue on error — partial data is better than none
-        }
-
-        if (i + batchSize < moreIds.length) {
-            await sleep(RATE_LIMIT_DELAY);
-        }
-    }
-}
-
-// ── Truncate comment tree ──────────────────────────────────────────
-
-function truncateComments(comments: Comment[], limit: number): Comment[] {
-    if (limit === -1) return comments;
-
-    let count = 0;
-    function truncateLevel(nodes: Comment[]): Comment[] {
-        const result: Comment[] = [];
-        for (const node of nodes) {
-            if (count >= limit) break;
-            count++;
-            result.push({
-                ...node,
-                replies: truncateLevel(node.replies),
-            });
-        }
-        return result;
-    }
-
-    return truncateLevel(comments);
-}
 
 // ── API Routes ─────────────────────────────────────────────────────
 
@@ -388,6 +288,113 @@ app.get("/api/folders/:id/threads", async (req: express.Request, res: express.Re
 
 // ── AI Analysis Route ─────────────────────────────────────────────
 
+// ── Analysis Queue (BullMQ) ────────────────────────────────────────
+
+import { Queue, Worker, QueueEvents } from "bullmq";
+import { redis } from "./server/middleware/rateLimiter.js"; // Reuse Redis connection
+
+// Reuse the ioredis instance from rateLimiter for the Queue connection
+// Note: BullMQ requires a specific connection structure, but usually accepts ioredis instance or config
+// Ideally we pass connection config. Let's use the Redis URL from env directly for BullMQ to be safe
+// as it manages its own connections for blocking/non-blocking.
+const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+
+const analysisQueue = new Queue("analysis", {
+    connection: {
+        url: redisUrl
+    }
+});
+console.log("[INIT] BullMQ Analysis Queue initialized.");
+
+const analysisQueueEvents = new QueueEvents("analysis", {
+    connection: {
+        url: redisUrl
+    }
+});
+console.log("[INIT] BullMQ Queue Events initialized.");
+
+// Worker Processor
+const analysisWorker = new Worker("analysis", async (job) => {
+    const { threadsContext, folderContext, userUid, folderId, plan } = job.data;
+    console.log(`[Worker] Processing analysis for folder ${folderId} (User: ${userUid})`);
+
+    try {
+        // HYBRID STORAGE: Resolve external content before analysis
+        const resolvedThreads = await Promise.all(threadsContext.map(async (t: any) => {
+            if (t.storageUrl && !t.comments) {
+                try {
+                    console.log(`[Worker] Fetching external content for thread ${t.id}: ${t.storageUrl}`);
+
+                    // Parse bucket and path from URL
+                    // Example: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/PATH?alt=media
+                    const url = new URL(t.storageUrl);
+                    const pathWithV0 = url.pathname.split('/o/')[1].split('?')[0];
+                    const filePath = decodeURIComponent(pathWithV0);
+
+                    const [fileContents] = await getAdminStorage().bucket().file(filePath).download();
+                    const contentJson = JSON.parse(fileContents.toString());
+
+                    // Extract comments from content JSON
+                    // The structure depends on the platform
+                    let comments = contentJson.flattenedComments || contentJson.comments || contentJson.reviews || [];
+
+                    return { ...t, comments };
+                } catch (fetchErr) {
+                    console.error(`[Worker] Failed to fetch storage content for ${t.id}:`, fetchErr);
+                    return t; // Fallback to partial data
+                }
+            }
+            return t;
+        }));
+
+        const result = await analyzeThreads(resolvedThreads, folderContext);
+
+        // Calculate total comments (approximate from context or passed data)
+        // For simplicity in worker, we might need to pass this count or recalculate
+        // Let's assume the mutation of user stats happens here or we return result
+
+        const parsedResult = JSON.parse(result);
+        parsedResult.createdAt = new Date().toISOString();
+
+        // Save to Firestore
+        await saveAnalysis(userUid, folderId, parsedResult, "gemini-flash-latest");
+
+        // Deduct Credit (Increment Usage)
+        // We need to calculate total comments again or pass it in job data
+        // For now, let's pass it in job.data to avoid recalculation
+        const { totalComments, threadCount } = job.data;
+
+        await updateStats(userUid, {
+            reportsGenerated: 1,
+            intelligenceScanned: threadCount,
+            commentsAnalyzed: totalComments,
+            hoursSaved: parseFloat((threadCount * 5 / 60).toFixed(1))
+        });
+
+        console.log(`[Worker] Analysis complete for ${folderId}`);
+        return parsedResult;
+
+    } catch (err: any) {
+        console.error(`[Worker] Failed analysis for ${folderId}:`, err);
+        throw err;
+    }
+}, {
+    connection: {
+        url: redisUrl
+    },
+    concurrency: 5 // Process 5 AI jobs concurrently
+});
+
+analysisWorker.on('completed', (job, returnvalue) => {
+    console.log(`[BullMQ] Job ${job.id} completed!`);
+});
+
+analysisWorker.on('failed', (job, err) => {
+    console.error(`[BullMQ] Job ${job?.id} failed:`, err);
+});
+
+// ── API Routes ─────────────────────────────────────────────────────
+
 app.post("/api/folders/:id/analyze", async (req: express.Request, res: express.Response) => {
     if (!req.user) {
         res.status(401).json({ error: "Unauthorized" });
@@ -407,65 +414,70 @@ app.post("/api/folders/:id/analyze", async (req: express.Request, res: express.R
             return;
         }
 
-        // 3. Add to Analysis Queue
-        const analysisResult = await analysisQueue.add(async () => {
-            console.log(`[AI] Starting analysis for folder ${req.params.id} (${savedThreads.length} threads)`);
-
-            // Map to simplified context for AI
-            const threadsContext = savedThreads.map(t => ({
-                id: t.id,
-                title: t.title,
-                subreddit: t.subreddit,
-                comments: t.data.comments // Full comment tree
-            }));
-
-            return await analyzeThreads(threadsContext, folderContext);
-        });
-
         // Calculate total comments
         const totalComments = savedThreads.reduce((sum, thread) => {
             const count = thread.data.comments ? countComments(thread.data.comments) : 0;
-            console.log(`[DEBUG] Thread ${thread.id} comments: ${count} (has comments array: ${!!thread.data.comments})`);
             return sum + count;
         }, 0);
 
-        console.log(`[DEBUG] Total comments to credit: ${totalComments} for user ${req.user.uid}`);
+        // Map to simplified context for AI
+        const threadsContext = savedThreads.map(t => ({
+            id: t.id,
+            title: t.title,
+            subreddit: t.subreddit,
+            comments: (t.data as any)?.comments || null,
+            storageUrl: (t as any).storageUrl || null
+        }));
 
-        // 3. Save & Return
-        const parsedResult = JSON.parse(analysisResult);
-        // Inject timestamp for immediate frontend display
-        parsedResult.createdAt = new Date().toISOString();
-
-        // Save to Firestore (Fire & Forget)
-        saveAnalysis(req.user.uid, req.params.id as string, parsedResult, "gemini-flash-latest");
-
-        // Deduct Credit (Increment Usage)
-        await updateStats(req.user.uid, {
-            reportsGenerated: 1,
-            intelligenceScanned: savedThreads.length,
-            commentsAnalyzed: totalComments,
-            // Estimate hours saved (approx 5 mins per thread manual reading)
-            hoursSaved: parseFloat((savedThreads.length * 5 / 60).toFixed(1))
+        // 3. Add to Analysis Queue (BullMQ)
+        // We await the job addition, but the processing is async
+        const job = await analysisQueue.add("analyze-folder", {
+            threadsContext,
+            folderContext,
+            userUid: req.user.uid,
+            folderId: req.params.id,
+            plan: req.user.plan,
+            totalComments,
+            threadCount: savedThreads.length
         });
 
-        let responsePayload = parsedResult;
+        console.log(`[API] Enqueued analysis job ${job.id} for user ${req.user.uid}`);
 
-        // Redact for Free Users immediately
-        if (req.user.plan === 'free') {
-            responsePayload = redactAnalysis(parsedResult);
+        // For MVP: We want to wait for the job to finish to return the response to the frontend
+        // In a real async architecture, we would return 202 Accepted and have the frontend poll
+        // But to keep frontend changes minimal (or zero), we can wait for the job here
+        // Note: serverless functions might time out, but we are on Render/Cloud Run so we have some time.
+
+        try {
+            const result = await job.waitUntilFinished(analysisQueueEvents);
+            // Warning: waitUntilFinished requires QueueEvents. 
+            // If we don't want to set up QueueEvents yet, we can't wait.
+            // Actually, for MVP, if we switch to async, the frontend breaks.
+            // Let's try to keep it pseudo-sync or return "Processing started"
+
+            // DECISION: To avoid breaking the frontend "Analyze" button which expects a result,
+            // we will implement a simple Polling mechanism or just simple "await job.finished()".
+            // BullMQ job.finished() is what we want.
+
+            const finishedResult = await job.waitUntilFinished(new QueueEvents('analysis', { connection: { url: redisUrl } }));
+
+            let responsePayload = finishedResult;
+
+            // Redact for Free Users immediately
+            if (req.user.plan === 'free') {
+                responsePayload = redactAnalysis(finishedResult);
+            }
+
+            res.json(responsePayload);
+
+        } catch (jobErr) {
+            console.error("Job Failed:", jobErr);
+            res.status(500).json({ error: "Analysis failed during processing" });
         }
-
-        res.json(responsePayload);
 
     } catch (err: any) {
         console.error("Analysis Error:", err);
-        if (err.message?.includes("GEMINI_API_KEY")) {
-            res.status(500).json({ error: "AI Service not configured (missing key)" });
-        } else if (err.message?.includes("timed out")) {
-            res.status(503).json({ error: "Analysis timed out. Try analyzing fewer threads." });
-        } else {
-            res.status(500).json({ error: "Analysis failed: " + err.message });
-        }
+        res.status(500).json({ error: "Analysis failed: " + err.message });
     }
 });
 
@@ -675,14 +687,13 @@ app.get("/api/extractions", async (req: express.Request, res: express.Response) 
 
 // ── Health Check ───────────────────────────────────────────────────
 
-app.get("/api/health", (_req: express.Request, res: express.Response) => {
+app.get("/api/health", async (_req: express.Request, res: express.Response) => {
+    const counts = await analysisQueue.getJobCounts();
     res.json({
         status: "ok",
         version: TOOL_VERSION,
-        queueSize: fetchQueue.size,
-        queuePending: fetchQueue.pending,
-        analysisQueueSize: analysisQueue.size,
-        analysisQueuePending: analysisQueue.pending,
+        redis: redis.status,
+        queue: counts
     });
 });
 
@@ -695,7 +706,8 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 // ── Start ──────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
-    console.log(`🚀 OpinionDeck Platform Server running on http://localhost:${PORT}`);
-    console.log(`   Fetch Queue: 20 concurrent | Analysis Queue: 5 concurrent`);
+app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 OpinionDeck Platform Server running on port ${PORT}`);
+    console.log(`   Host: 0.0.0.0 (Required for Cloud Run)`);
+    console.log(`   Redis Status: ${redis.status}`);
 });

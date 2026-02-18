@@ -7,21 +7,73 @@ chrome.runtime.onInstalled.addListener(() => {
         .catch((error) => console.error(error));
 });
 
+// Firebase Storage Upload Helper
+async function uploadToStorage(data: any, uid: string, token: string) {
+    const BUCKET = import.meta.env.VITE_STORAGE_BUCKET;
+    const filePath = `extractions/${uid}/${Date.now()}_${Math.random().toString(36).substring(7)}.json`;
+    const url = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o?name=${encodeURIComponent(filePath)}`;
+
+    console.log(`[OpinionDeck] Uploading large payload to storage: ${filePath}`);
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Storage Upload Failed: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    return `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(filePath)}?alt=media&token=${result.downloadTokens || ''}`;
+}
+
 // Helper to save to backend
 async function saveToBackend(data: any) {
-    const API_URL = 'https://opinion-deck.onrender.com/api/extractions';
+    const API_URL = `${import.meta.env.VITE_API_URL}/api/extractions`;
 
-    const authRecord = await chrome.storage.local.get('opinion_deck_token');
+    const authRecord = await chrome.storage.local.get(['opinion_deck_token', 'opinion_deck_api_url']);
     const token = authRecord.opinion_deck_token;
+    const finalApiUrl = authRecord.opinion_deck_api_url || API_URL;
 
     try {
-        const response = await fetch(API_URL, {
+        let payload = { ...data };
+        const dataSize = JSON.stringify(data).length;
+        console.log(`[OpinionDeck] Payload size: ${dataSize} bytes`);
+
+        // HYBRID STORAGE: If payload > 500KB, upload to Firebase Storage
+        if (dataSize > 500 * 1024 && token) {
+            try {
+                // We need UID from token if possible, or just use 'anonymous' 
+                // but token-based upload is safer. Let's try to extract UID from JWT.
+                const tokenParts = token.split('.');
+                const payloadStr = atob(tokenParts[1]);
+                const tokenData = JSON.parse(payloadStr);
+                const uid = tokenData.user_id || tokenData.uid || 'anon';
+
+                const storageUrl = await uploadToStorage(data.content, uid, token);
+                console.log(`[OpinionDeck] Hybrid Storage Success: ${storageUrl}`);
+
+                // Replace content with storageUrl stub
+                payload.content = null;
+                payload.storageUrl = storageUrl;
+            } catch (storageErr) {
+                console.warn("[OpinionDeck] Hybrid Storage Upload failed, falling back to direct save:", storageErr);
+            }
+        }
+
+        const response = await fetch(finalApiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 ...(token ? { 'Authorization': `Bearer ${token}` } : { 'X-OpinionDeck-Dev': 'true' })
             },
-            body: JSON.stringify({ data })
+            body: JSON.stringify({ data: payload })
         });
 
         if (!response.ok) {
@@ -65,9 +117,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         chrome.storage.local.set({
             'opinion_deck_token': token,
-            // Fallback defaults if not provided (App.tsx currently only sends token)
-            'opinion_deck_api_url': apiUrl || 'https://opinion-deck.onrender.com',
-            'opinion_deck_dashboard_url': dashboardUrl || 'https://app.opiniondeck.com'
+            // Fallback defaults from environment if not provided
+            'opinion_deck_api_url': apiUrl || `${import.meta.env.VITE_API_URL}/api`,
+            'opinion_deck_dashboard_url': dashboardUrl || import.meta.env.VITE_DASHBOARD_URL
         }, () => {
             console.log("[OpinionDeck] Extension Auth Sync: Success");
             sendResponse({ status: 'success' });
@@ -82,19 +134,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
 
-    if (request.action === 'ANALYZE_DATA') {
-        // Simulated AI response for now
-        setTimeout(() => {
-            sendResponse({
-                status: 'success',
-                results: {
-                    executive_summary: "Managed Analysis: This thread emphasizes a high demand for 'Advanced Analytics' and reports a bug in the 'CSV Export'.",
-                    quality_score: 92
-                }
-            });
-        }, 2000);
-        return true;
-    }
+    // ANALYZE_DATA handler removed (dead code)
 
     if (request.action === 'FETCH_REDDIT_JSON') {
         const { url } = request;

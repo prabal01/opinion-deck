@@ -4,14 +4,13 @@ This document tracks planned infrastructure improvements, architectural changes,
 
 ## 🟢 Immediate / High Priority
 
-- [ ] **Cleanup**: Remove dead Reddit fetching code from `src/server.ts` (`fetchWithRetry`, `resolveMoreComments`, `transformPost` etc.).
-    - **Context**: We now rely entirely on the Chrome Extension for data extraction. The server should only process/store data, not fetch it.
-- [ ] **Cleanup**: Remove mocked `ANALYZE_DATA` / `setTimeout` from `chrome-extension/src/background.ts`.
-    - **Context**: Analysis happens on the backend or via a distinct flow, not a mocked delay in the background script.
-- [ ] **Infrastructure**: Move `p-queue` (Job Queues) and Rate Limiter state to a persistent backend.
-    - **Context**: In-memory state is lost on server restarts.
-    - **Selected Plan**: Use **Redis Cloud (Free Tier)** for persistence.
-    - **Status**: Evaluation Complete ([Read Report](/Users/prabalsaxena/.gemini/antigravity/brain/6f425277-f210-45d8-a1fe-0f0604ad5561/redis_evaluation.md)). Requirements: Redis 6.2+.
+- [x] **Cleanup**: Remove dead Reddit fetching code from `src/server.ts`.
+    - **Status**: Completed.
+- [x] **Cleanup**: Remove mocked `ANALYZE_DATA` from `chrome-extension`.
+    - **Status**: Completed.
+- [x] **Infrastructure**: Move `p-queue` (Job Queues) and Rate Limiter state to Redis.
+    - **Context**: In-memory state is lost on server restarts. Persistence achieved via Redis Cloud.
+    - **Status**: Completed.
 - [ ] **Data Architecture**: Implement Large Payload Strategy (Hybrid Storage).
     - **Context**: Firestore 1MB limit & Node.js 50MB parsing bottleneck.
     - **Plan**: 

@@ -1,75 +1,57 @@
-import type { Request, Response, NextFunction } from "express";
-import { getEffectiveConfig } from "./auth.js";
+import { Request, Response, NextFunction } from "express";
+import { Redis } from "ioredis";
 
-/**
- * Sliding window rate limiter.
- * Limits are driven by the user's resolved PlanConfig (not hardcoded).
- *
- * - Authenticated users → keyed by UID, limits from config
- * - Unauthenticated → keyed by IP, limits from free plan config
- */
+// Initialize Redis Client
+// Uses REDIS_URL from .env (e.g., redis://:password@host:port)
+const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+    retryStrategy(times) {
+        const delay = Math.min(times * 50, 2000);
+        return delay;
+    },
+});
 
-interface RateLimitEntry {
-    timestamps: number[];
-}
+redis.on("error", (err) => {
+    // Suppress connection errors to avoid log spam if Redis is down (fail open)
+    console.warn("[REDIS] Connection Error:", err.message);
+});
 
-const rateLimitStore = new Map<string, RateLimitEntry>();
+redis.on("connect", () => {
+    console.log("[REDIS] Connected to Redis Cloud");
+});
 
-// Clean up old entries every 5 minutes
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of rateLimitStore) {
-        // Remove entries with all timestamps expired (> 5 min old)
-        entry.timestamps = entry.timestamps.filter((t) => now - t < 5 * 60 * 1000);
-        if (entry.timestamps.length === 0) {
-            rateLimitStore.delete(key);
+const WINDOW_SIZE_IN_SECONDS = 60;
+const MAX_WINDOW_REQUESTS = 60; // 60 requests per minute
+
+export const rateLimiterMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        // Use User ID if authenticated, otherwise IP
+        // @ts-ignore - req.user added by auth middleware
+        const key = req.user ? `rate_limit:user:${req.user.uid}` : `rate_limit:ip:${req.ip}`;
+
+        // Simple Fixed Window Counter
+        const currentCount = await redis.incr(key);
+
+        if (currentCount === 1) {
+            // Set expiration on first increment
+            await redis.expire(key, WINDOW_SIZE_IN_SECONDS);
         }
+
+        if (currentCount > MAX_WINDOW_REQUESTS) {
+            res.status(429).json({
+                error: "Too many requests",
+                message: "You have exceeded the 60 requests in 1 minute limit!",
+            });
+            return;
+        }
+
+        next();
+    } catch (error) {
+        console.error("[RateLimiter] Redis Error:", error);
+        // Fail open if Redis is down so users aren't blocked
+        next();
     }
-}, 5 * 60 * 1000);
+};
 
-export async function rateLimiterMiddleware(
-    req: Request,
-    res: Response,
-    next: NextFunction
-): Promise<void> {
-    const config = await getEffectiveConfig(req);
-    const limit = config.rateLimit;
-    const windowMs = config.rateLimitWindow * 1000;
-
-    // Key: UID for authenticated users, IP for anonymous
-    const key = req.user?.uid || getClientIp(req);
-    const now = Date.now();
-
-    let entry = rateLimitStore.get(key);
-    if (!entry) {
-        entry = { timestamps: [] };
-        rateLimitStore.set(key, entry);
-    }
-
-    // Remove timestamps outside the current window
-    entry.timestamps = entry.timestamps.filter((t) => now - t < windowMs);
-
-    if (entry.timestamps.length >= limit) {
-        const oldestInWindow = entry.timestamps[0];
-        const retryAfter = Math.ceil((oldestInWindow + windowMs - now) / 1000);
-
-        res.set("Retry-After", String(retryAfter));
-        res.status(429).json({
-            error: "Too many requests. Please try again later.",
-            retryAfter,
-        });
-        return;
-    }
-
-    entry.timestamps.push(now);
-    next();
-}
-
-function getClientIp(req: Request): string {
-    // Handle proxied requests (e.g., behind Vercel, Railway, nginx)
-    const forwarded = req.headers["x-forwarded-for"];
-    if (typeof forwarded === "string") {
-        return forwarded.split(",")[0].trim();
-    }
-    return req.ip || req.socket.remoteAddress || "unknown";
-}
+export { redis }; // Export for use in other files (Queue)
