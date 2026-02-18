@@ -3,7 +3,7 @@ import React from 'react';
 import './AnalysisResults.css';
 import {
     Lock, Clock, Download, FileText, CheckCircle2, MinusCircle, XCircle,
-    Megaphone, Target, MessageSquare, Lightbulb, Trophy, Bug, PieChart
+    Megaphone, Target, MessageSquare, Lightbulb, Trophy, Bug
 } from 'lucide-react';
 
 interface Theme {
@@ -81,112 +81,6 @@ interface AnalysisData {
     };
 }
 
-const LockedBlur: React.FC<{ title: string; count: number; type?: 'leads' | 'signals' | 'general' }> = ({ title, count, type = 'general' }) => {
-    return (
-        <div className="locked-blur-container" style={{
-            position: 'relative',
-            overflow: 'hidden',
-            borderRadius: '16px',
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-light)',
-            marginTop: '20px',
-            boxShadow: 'inset 0 0 20px rgba(0,0,0,0.2)'
-        }}>
-            {/* Fake Content Layer */}
-            <div style={{ padding: '20px', filter: 'blur(8px)', opacity: 0.4, userSelect: 'none', pointerEvents: 'none' }}>
-                {type === 'leads' ? (
-                    // Fake Leads Rows
-                    [1, 2, 3].map(i => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
-                            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--text-secondary)' }}></div>
-                            <div style={{ flex: 1 }}>
-                                <div style={{ width: '40%', height: '14px', background: 'var(--text-secondary)', marginBottom: '8px', borderRadius: '4px' }}></div>
-                                <div style={{ width: '80%', height: '10px', background: 'var(--text-secondary)', opacity: 0.6, borderRadius: '4px' }}></div>
-                            </div>
-                        </div>
-                    ))
-                ) : (
-                    // Fake Text Rows
-                    [1, 2, 3].map(i => (
-                        <div key={i} style={{ marginBottom: '20px' }}>
-                            <div style={{ width: '25%', height: '12px', background: 'var(--text-secondary)', marginBottom: '10px', borderRadius: '4px' }}></div>
-                            <div style={{ width: '90%', height: '10px', background: 'var(--text-secondary)', opacity: 0.6, marginBottom: '6px', borderRadius: '4px' }}></div>
-                            <div style={{ width: '70%', height: '10px', background: 'var(--text-secondary)', opacity: 0.6, borderRadius: '4px' }}></div>
-                        </div>
-                    ))
-                )}
-            </div>
-
-            {/* Overlay Gradient */}
-            <div style={{
-                position: 'absolute',
-                top: 0, left: 0, right: 0, bottom: 0,
-                background: 'linear-gradient(to bottom, transparent 0%, var(--bg-card) 90%)',
-                zIndex: 1
-            }} />
-
-            {/* Upsell Card */}
-            <div style={{
-                position: 'absolute',
-                top: 0, left: 0, right: 0, bottom: 0,
-                display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center',
-                zIndex: 2,
-                padding: '20px'
-            }}>
-                <div style={{
-                    background: 'rgba(30, 30, 40, 0.70)',
-                    backdropFilter: 'blur(16px)',
-                    WebkitBackdropFilter: 'blur(16px)',
-                    padding: '30px 40px',
-                    borderRadius: '24px',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    boxShadow: '0 20px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
-                    maxWidth: '400px',
-                    width: '100%',
-                    transform: 'translateY(10px)'
-                }}>
-                    <div style={{
-                        fontSize: '2rem',
-                        background: 'rgba(255,255,255,0.05)',
-                        width: '60px', height: '60px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        borderRadius: '50%',
-                        marginBottom: '4px',
-                        border: '1px solid rgba(255,255,255,0.1)'
-                    }}>
-                        <Lock size={32} color="white" />
-                    </div>
-
-                    <div style={{ textAlign: 'center' }}>
-                        <h4 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700, color: 'white' }}>
-                            Unlock {count > 0 ? count : ''} Hidden {title}
-                        </h4>
-                        <p style={{ margin: 0, fontSize: '0.9rem', color: '#a0a0b8', lineHeight: 1.5 }}>
-                            Upgrade to Pro to reveal high-value signals and leads detected in this thread.
-                        </p>
-                    </div>
-
-                    <a href="/pricing" className="btn-primary" style={{
-                        padding: '12px 32px',
-                        fontSize: '1rem',
-                        textDecoration: 'none',
-                        background: 'linear-gradient(135deg, #FF4500 0%, #FF8717 100%)',
-                        boxShadow: '0 4px 12px rgba(255, 69, 0, 0.3)',
-                        borderRadius: '12px',
-                        fontWeight: 600,
-                        width: '100%',
-                        textAlign: 'center',
-                        marginTop: '8px'
-                    }}>
-                        Unlock Full Report
-                    </a>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (id: string) => void }> = ({ data, onCitationClick }) => {
     const handleExportJSON = () => {
