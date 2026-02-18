@@ -56,13 +56,14 @@ export async function authMiddleware(
     const adminAuth = getAdminAuth();
 
     if (!adminAuth) {
-        // Mock user for local dev without Firestore/Auth
-        req.user = {
-            uid: "mock-user-123",
-            email: "mock@local.dev",
-            plan: "pro",
-            config: await getPlanConfig("pro"),
-        };
+        if (process.env.NODE_ENV === 'production') {
+            console.error("CRITICAL: Firebase Auth not initialized in production.");
+            return next(); // Downstream will catch req.user === null and return 401
+        }
+
+        // Mock user for local dev without Firestore/Auth (optional, kept for easy local testing if specifically desired)
+        // But let's make it explicit: only if devBypass was already handled or similar.
+        // Actually, let's just treat it as unauthenticated if Auth is missing to avoid confusion.
         return next();
     }
 

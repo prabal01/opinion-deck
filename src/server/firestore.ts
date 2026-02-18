@@ -60,6 +60,10 @@ export function initFirebase(): void {
             console.log("✅ Firebase initialized successfully with Storage.");
         } catch (err: any) {
             console.error("❌ Firebase initialization failed:", err.message);
+            // In production, we want to know if this fails immediately.
+            if (process.env.NODE_ENV === 'production') {
+                throw new Error("CRITICAL: Firebase initialization failed in production: " + err.message);
+            }
         }
     }
 }
@@ -161,7 +165,7 @@ export async function getPlanConfig(plan: string): Promise<PlanConfig> {
     }
 
     if (!db) {
-        return plan === "pro" ? DEFAULT_PRO_CONFIG : DEFAULT_FREE_CONFIG;
+        throw new Error("Firebase DB not initialized. Cannot fetch plan config.");
     }
 
     try {
@@ -205,17 +209,7 @@ export async function getOrCreateUser(
     }
 
     if (!db) {
-        // No Firestore → return a default free user
-        return {
-            uid,
-            email,
-            plan: "free",
-            configOverrides: {},
-            stripeCustomerId: null,
-            stripeSubscriptionId: null,
-            createdAt: new Date().toISOString(),
-            fetchCount: 0,
-        };
+        throw new Error("Firebase DB not initialized. Cannot get or create user.");
     }
 
     const ref = db.collection("users").doc(uid);
@@ -317,18 +311,7 @@ export async function getFolders(uid: string): Promise<Folder[]> {
 }
 
 export async function createFolder(uid: string, name: string, description?: string): Promise<Folder> {
-    if (!db) {
-        // Mock folder for local dev without Firestore
-        return {
-            id: `mock_folder_${Date.now()}`,
-            uid,
-            name,
-            description,
-            color: "#6366f1",
-            createdAt: new Date().toISOString(),
-            threadCount: 0,
-        };
-    }
+    if (!db) throw new Error("Firebase DB not initialized");
     const ref = db.collection("folders").doc();
     const folder: Folder = {
         id: ref.id,
@@ -372,10 +355,7 @@ export async function deleteFolder(uid: string, folderId: string): Promise<void>
 // ── Saved Threads Management ───────────────────────────────────────
 
 export async function saveThreadToFolder(uid: string, folderId: string, threadData: any): Promise<void> {
-    if (!db) {
-        console.log(`[MOCK] Save thread to folder ${folderId}`);
-        return;
-    }
+    if (!db) throw new Error("Firebase DB not initialized");
 
     const folderRef = db.collection("folders").doc(folderId);
     const folderDoc = await folderRef.get();
@@ -555,10 +535,7 @@ export interface ExtractedData {
 }
 
 export async function saveExtractedData(uid: string, data: Omit<ExtractedData, "uid">): Promise<void> {
-    if (!db) {
-        console.log(`[MOCK] Save extraction ${data.id} for user ${uid}`);
-        return;
-    }
+    if (!db) throw new Error("Firebase DB not initialized");
 
     const ref = db.collection("users").doc(uid).collection("extractions").doc(data.id);
     await ref.set({
