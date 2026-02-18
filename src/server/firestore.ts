@@ -585,13 +585,18 @@ export async function getUserStats(uid: string): Promise<UserStats> {
 
 export async function updateStats(uid: string, updates: Partial<UserStats>): Promise<void> {
     if (!db) return;
-    const { FieldValue } = await import("firebase-admin/firestore");
-    const ref = db.collection("users").doc(uid).collection("stats").doc("summary");
+    try {
+        const { FieldValue } = await import("firebase-admin/firestore");
+        const ref = db.collection("users").doc(uid).collection("stats").doc("summary");
 
-    const dbUpdates: Record<string, any> = {};
-    for (const [key, value] of Object.entries(updates)) {
-        dbUpdates[key] = FieldValue.increment(value as number);
+        const dbUpdates: Record<string, any> = {};
+        for (const [key, value] of Object.entries(updates)) {
+            dbUpdates[key] = FieldValue.increment(value as number);
+        }
+
+        await ref.set(dbUpdates, { merge: true });
+        console.log(`[FIRESTORE] Updated stats for ${uid}:`, updates);
+    } catch (err) {
+        console.error(`[FIRESTORE] Failed to update stats for ${uid}:`, err);
     }
-
-    await ref.set(dbUpdates, { merge: true });
 }

@@ -159,9 +159,10 @@ export function mergeIntoTree(existingTree: Comment[], newComments: Comment[]): 
  * Count total comments in a tree (including nested)
  */
 export function countComments(comments: Comment[]): number {
+    if (!comments || !Array.isArray(comments)) return 0;
     let count = 0;
     for (const c of comments) {
-        count += 1 + countComments(c.replies);
+        count += 1 + countComments(c.replies || []);
     }
     return count;
 }

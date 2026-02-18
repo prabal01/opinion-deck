@@ -1,6 +1,10 @@
 
 import React from 'react';
 import './AnalysisResults.css';
+import {
+    Lock, Clock, Download, FileText, CheckCircle2, MinusCircle, XCircle,
+    Megaphone, Target, MessageSquare, Lightbulb, Trophy, Bug, PieChart
+} from 'lucide-react';
 
 interface Theme {
     title: string;
@@ -152,7 +156,7 @@ const LockedBlur: React.FC<{ title: string; count: number; type?: 'leads' | 'sig
                         marginBottom: '4px',
                         border: '1px solid rgba(255,255,255,0.1)'
                     }}>
-                        🔒
+                        <Lock size={32} color="white" />
                     </div>
 
                     <div style={{ textAlign: 'center' }}>
@@ -230,15 +234,15 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                     <h2>📊 AI Research Report</h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                         {data.createdAt && (
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', fontWeight: 500 }}>
-                                🕒 {new Date(data.createdAt).toLocaleString()}
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Clock size={14} /> {new Date(data.createdAt).toLocaleString()}
                             </span>
                         )}
                         {data.isLocked && <span className="badge-new" style={{ background: 'var(--warning-color)', color: 'black' }}>FREE PREVIEW</span>}
                     </div>
                     <div className="export-actions" style={{ display: 'flex', gap: '15px', marginTop: '8px' }}>
-                        <button className="btn-text" onClick={handleExportJSON} style={{ fontSize: '0.7rem', opacity: 0.7 }}>📥 Export JSON</button>
-                        <button className="btn-text" onClick={handleExportMarkdown} style={{ fontSize: '0.7rem', opacity: 0.7 }}>📝 Export Markdown</button>
+                        <button className="btn-text" onClick={handleExportJSON} style={{ fontSize: '0.7rem', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '4px' }}><Download size={14} /> Export JSON</button>
+                        <button className="btn-text" onClick={handleExportMarkdown} style={{ fontSize: '0.7rem', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '4px' }}><FileText size={14} /> Export Markdown</button>
                     </div>
                 </div>
 
@@ -255,8 +259,8 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                                 "{data.quality_reasoning}"
                             </span>
                         ) : data.isLocked && (
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
-                                🔒 Unlock for reasoning
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <Lock size={12} /> Unlock for reasoning
                             </span>
                         )}
                     </div>
@@ -270,9 +274,9 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                             <div className="seg neg" style={{ flexGrow: data.sentiment_breakdown.negative || 0 }} title={`Negative: ${data.sentiment_breakdown.negative || 0}%`} />
                         </div>
                         <div className="sentiment-legend">
-                            <span>🟢 {data.sentiment_breakdown.positive || 0}% Positive</span>
-                            <span>⚪ {data.sentiment_breakdown.neutral || 0}% Neutral</span>
-                            <span>🔴 {data.sentiment_breakdown.negative || 0}% Negative</span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><CheckCircle2 size={14} color="var(--success-color)" /> {data.sentiment_breakdown.positive || 0}% Positive</span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MinusCircle size={14} color="var(--text-tertiary)" /> {data.sentiment_breakdown.neutral || 0}% Neutral</span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><XCircle size={14} color="var(--error-color)" /> {data.sentiment_breakdown.negative || 0}% Negative</span>
                         </div>
                     </div>
                 )}
@@ -292,7 +296,7 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                 {/* Potential Leads Section */}
                 {(data.potential_leads && data.potential_leads.length > 0) ? (
                     <div className="analysis-card leads-card" style={{ gridColumn: '1 / -1' }}>
-                        <div className="card-header-accent outreach">📣 Potential Customer Outreach</div>
+                        <div className="card-header-accent outreach" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Megaphone size={18} /> Potential Customer Outreach</div>
                         <h3>High Intent Leads ({data.potential_leads.length})</h3>
 
                         <div className="leads-list-compact" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px', marginTop: '10px' }}>
@@ -334,7 +338,7 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                                                     display: 'flex', alignItems: 'center', gap: '8px',
                                                     fontSize: '0.8rem', fontWeight: 600
                                                 }}>
-                                                    🔒 Upgrade to Unlock
+                                                    <Lock size={12} /> Upgrade to Unlock
                                                 </div>
                                             </div>
                                         </>
@@ -363,7 +367,7 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                 {/* Buying Intent Signals */}
                 {(data.buying_intent_signals && data.buying_intent_signals.length > 0) ? (
                     <div className="analysis-card buying-intent">
-                        <div className="card-header-accent">🎯 High Value Signals</div>
+                        <div className="card-header-accent" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Target size={18} /> High Value Signals</div>
                         <h3>Buying Intent Detected ({data.buying_intent_signals.length})</h3>
                         <ul className="intent-list">
                             {data.buying_intent_signals.map((signal, i) => (
@@ -390,7 +394,7 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                                                     fontSize: '0.75rem', fontWeight: 600,
                                                     display: 'flex', alignItems: 'center', gap: '6px'
                                                 }}>
-                                                    🔒 Upgrade to Unlock
+                                                    <Lock size={12} /> Upgrade to Unlock
                                                 </div>
                                             </div>
                                         </>
@@ -414,7 +418,7 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                 {/* Engagement Opportunities */}
                 {(data.engagement_opportunities && data.engagement_opportunities.length > 0) ? (
                     <div className="analysis-card engagement">
-                        <div className="card-header-accent" style={{ background: '#3b82f6' }}>💬 Engagement & Reply Tips</div>
+                        <div className="card-header-accent" style={{ background: '#3b82f6', display: 'flex', alignItems: 'center', gap: '8px' }}><MessageSquare size={18} /> Engagement & Reply Tips</div>
                         <h3>Engagement Opportunities ({data.engagement_opportunities.length})</h3>
                         <ul className="engagement-list">
                             {data.engagement_opportunities.map((opp, i) => (
@@ -452,7 +456,7 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                                                     fontSize: '0.75rem', fontWeight: 600,
                                                     display: 'flex', alignItems: 'center', gap: '6px'
                                                 }}>
-                                                    🔒 Upgrade to Unlock
+                                                    <Lock size={12} /> Upgrade to Unlock
                                                 </div>
                                             </div>
                                         </>
@@ -493,7 +497,7 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                 {/* Feature Requests */}
                 {(data.feature_requests && data.feature_requests.length > 0) ? (
                     <div className="analysis-card features">
-                        <div className="card-header-accent" style={{ background: '#f59e0b' }}>💡 Feature Requests</div>
+                        <div className="card-header-accent" style={{ background: '#f59e0b', display: 'flex', alignItems: 'center', gap: '8px' }}><Lightbulb size={18} /> Feature Requests</div>
                         <h3>Feature Requests Detected ({data.feature_requests.length})</h3>
                         <ul className="feature-list">
                             {data.feature_requests.map((req, i) => (
@@ -520,7 +524,7 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                                                     fontSize: '0.75rem', fontWeight: 600,
                                                     display: 'flex', alignItems: 'center', gap: '6px'
                                                 }}>
-                                                    🔒 Upgrade to Unlock
+                                                    <Lock size={12} /> Upgrade to Unlock
                                                 </div>
                                             </div>
                                         </>
@@ -544,7 +548,7 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                 {/* Themes */}
                 {(data.themes || []).length > 0 && (
                     <div className="analysis-card themes">
-                        <h3>🏆 Top Themes ({data.themes.length})</h3>
+                        <h3><Trophy size={18} color="#eab308" style={{ display: 'inline', marginRight: '8px' }} /> Top Themes ({data.themes.length})</h3>
                         <ul className="theme-list">
                             {(data.themes || []).map((theme, i) => (
                                 <li key={i} className="theme-item" style={{ position: 'relative', overflow: 'hidden' }}>
@@ -574,7 +578,7 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                                                     fontSize: '0.75rem', fontWeight: 600,
                                                     display: 'flex', alignItems: 'center', gap: '6px'
                                                 }}>
-                                                    🔒 Upgrade to Unlock
+                                                    <Lock size={12} /> Upgrade to Unlock
                                                 </div>
                                             </div>
                                         </>
@@ -610,7 +614,7 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                 {/* Pain Points */}
                 {(data.pain_points || []).length > 0 && (
                     <div className="analysis-card pain-points">
-                        <h3>🐛 Pain Points & Bugs ({data.pain_points.length})</h3>
+                        <h3><Bug size={18} color="var(--error-color)" style={{ display: 'inline', marginRight: '8px' }} /> Pain Points & Bugs ({data.pain_points.length})</h3>
                         <ul className="pain-list">
                             {(data.pain_points || []).map((pp, i) => (
                                 <li key={i} className="pain-item" style={{ position: 'relative', overflow: 'hidden' }}>
@@ -636,7 +640,7 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                                                     fontSize: '0.75rem', fontWeight: 600,
                                                     display: 'flex', alignItems: 'center', gap: '6px'
                                                 }}>
-                                                    🔒 Upgrade to Unlock
+                                                    <Lock size={12} /> Upgrade to Unlock
                                                 </div>
                                             </div>
                                         </>

@@ -424,8 +424,12 @@ app.post("/api/folders/:id/analyze", async (req: express.Request, res: express.R
 
         // Calculate total comments
         const totalComments = savedThreads.reduce((sum, thread) => {
-            return sum + (thread.data.comments ? countComments(thread.data.comments) : 0);
+            const count = thread.data.comments ? countComments(thread.data.comments) : 0;
+            console.log(`[DEBUG] Thread ${thread.id} comments: ${count} (has comments array: ${!!thread.data.comments})`);
+            return sum + count;
         }, 0);
+
+        console.log(`[DEBUG] Total comments to credit: ${totalComments} for user ${req.user.uid}`);
 
         // 3. Save & Return
         const parsedResult = JSON.parse(analysisResult);

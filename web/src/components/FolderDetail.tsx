@@ -8,6 +8,7 @@ import { PremiumLoader, ButtonLoader } from './PremiumLoader';
 import './Folders.css';
 import './AnalysisResults.css';
 import { fetchFolderAnalysis } from '../lib/api';
+import { AlertTriangle, Sparkles, Trash2, BarChart2, ArrowDownCircle } from 'lucide-react';
 
 interface SavedThread {
     id: string;
@@ -174,7 +175,7 @@ export const FolderDetail: React.FC = () => {
         return (
             <div className="folder-detail-view">
                 <div className="error-banner">
-                    <span className="error-icon">⚠️</span>
+                    <span className="error-icon"><AlertTriangle size={20} /></span>
                     <p>Folder not found</p>
                 </div>
                 <button className="btn-secondary" onClick={() => navigate('/')}>
@@ -196,6 +197,7 @@ export const FolderDetail: React.FC = () => {
                             className="btn-primary analyze-btn"
                             onClick={handleAnalyze}
                             disabled={isAnalyzing}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                         >
                             {isAnalyzing ? (
                                 <>
@@ -203,12 +205,12 @@ export const FolderDetail: React.FC = () => {
                                     {loadingMsg}
                                 </>
                             ) : (
-                                <>{analyses.length > 0 ? "✨ Re-Analyze Folder" : "✨ Analyze with AI"}</>
+                                <>{analyses.length > 0 ? <><Sparkles size={16} /> Re-Analyze Folder</> : <><Sparkles size={16} /> Analyze with AI</>}</>
                             )}
                         </button>
                     )}
                     <button className="btn-icon delete-btn" onClick={handleDelete} title="Delete Folder">
-                        🗑️
+                        <Trash2 size={18} color="var(--error-color)" />
                     </button>
                 </div>
             </div>
@@ -227,7 +229,7 @@ export const FolderDetail: React.FC = () => {
 
             {analysisError && (
                 <div className="error-banner">
-                    <span className="error-icon">⚠️</span>
+                    <span className="error-icon"><AlertTriangle size={20} /></span>
                     <p>{analysisError}</p>
                 </div>
             )}
@@ -239,7 +241,7 @@ export const FolderDetail: React.FC = () => {
                             <details className="report-collapsible" open={index === 0}>
                                 <summary className="report-summary">
                                     <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        📊 AI Intelligence Report
+                                        <BarChart2 size={18} color="var(--primary-color)" /> AI Intelligence Report
                                         {analysis.createdAt && (
                                             <span style={{ fontSize: '0.8rem', fontWeight: 400, opacity: 0.8 }}>
                                                 — {new Date(analysis.createdAt).toLocaleString()}
@@ -260,7 +262,9 @@ export const FolderDetail: React.FC = () => {
                             </details>
                             {index === 0 && (
                                 <div className="analysis-divider">
-                                    <span>👇 Source Threads 👇</span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.7 }}>
+                                        <ArrowDownCircle size={16} /> Source Threads <ArrowDownCircle size={16} />
+                                    </span>
                                 </div>
                             )}
                         </div>
