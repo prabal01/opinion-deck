@@ -9,6 +9,7 @@ import type {
 } from "./reddit/types.js";
 import {
     initFirebase,
+    getFirebaseStatus,
     getAdminAuth,
     incrementFetchCount,
     getPlanConfig,
@@ -694,7 +695,7 @@ app.get("/api/health", async (_req: express.Request, res: express.Response) => {
         status: "ok",
         version: TOOL_VERSION,
         redis: redis.status,
-        firebase: !!getAdminAuth(),
+        firebase: getFirebaseStatus(),
         queue: counts
     });
 });

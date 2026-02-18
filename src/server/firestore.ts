@@ -8,17 +8,24 @@ import * as path from "path";
 let db: Firestore;
 let auth: Auth;
 let storage: Storage;
+let initStatus = {
+    initialized: false,
+    error: null as string | null,
+    source: "none" as "env" | "file" | "none"
+};
 
 export function initFirebase(): void {
     const firebaseServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
     let serviceAccount: ServiceAccount | null = null;
 
     if (firebaseServiceAccount) {
+        initStatus.source = "env";
         // Check if it's a JSON string or a path
         if (firebaseServiceAccount.trim().startsWith('{')) {
             try {
                 serviceAccount = JSON.parse(firebaseServiceAccount);
-            } catch (err) {
+            } catch (err: any) {
+                initStatus.error = `JSON Parse Error: ${err.message}`;
                 console.error("❌ Failed to parse FIREBASE_SERVICE_ACCOUNT JSON from environment.");
             }
         } else {
@@ -26,10 +33,12 @@ export function initFirebase(): void {
             if (fs.existsSync(resolved)) {
                 try {
                     serviceAccount = JSON.parse(fs.readFileSync(resolved, "utf-8"));
-                } catch (err) {
+                } catch (err: any) {
+                    initStatus.error = `File Parse Error: ${err.message}`;
                     console.error(`❌ Failed to parse service-account.json at ${resolved}`);
                 }
             } else {
+                initStatus.error = `File Not Found: ${resolved}`;
                 console.warn("⚠️ Firebase service account file not found. Auth & Firestore disabled.");
             }
         }
@@ -37,12 +46,15 @@ export function initFirebase(): void {
         // Fallback to local file
         const defaultPath = path.resolve("./service-account.json");
         if (fs.existsSync(defaultPath)) {
+            initStatus.source = "file";
             try {
                 serviceAccount = JSON.parse(fs.readFileSync(defaultPath, "utf-8"));
-            } catch (err) {
+            } catch (err: any) {
+                initStatus.error = `Default File Parse Error: ${err.message}`;
                 console.error("❌ Failed to parse default service-account.json");
             }
         } else {
+            initStatus.error = "FIREBASE_SERVICE_ACCOUNT env var not set and local file missing.";
             console.warn("⚠️ FIREBASE_SERVICE_ACCOUNT env var not set and local service-account.json missing.");
         }
     }
@@ -57,8 +69,11 @@ export function initFirebase(): void {
             db = getFirestore();
             auth = getAuth();
             storage = getStorage();
+            initStatus.initialized = true;
+            initStatus.error = null;
             console.log("✅ Firebase initialized successfully with Storage.");
         } catch (err: any) {
+            initStatus.error = `Init Error: ${err.message}`;
             console.error("❌ Firebase initialization failed:", err.message);
             // In production, we want to know if this fails immediately.
             if (process.env.NODE_ENV === 'production') {
@@ -66,6 +81,10 @@ export function initFirebase(): void {
             }
         }
     }
+}
+
+export function getFirebaseStatus() {
+    return initStatus;
 }
 
 export function getDb(): Firestore {
