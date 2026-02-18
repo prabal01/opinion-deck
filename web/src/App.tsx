@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { FolderProvider } from "./contexts/FolderContext";
@@ -17,7 +17,7 @@ import { BRANDING } from "./constants/branding";
 
 import { LoginView } from "./components/LoginView";
 
-function RequireAuth({ children }: { children: JSX.Element }) {
+function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) return <PremiumLoader fullPage text={`Loading ${BRANDING.NAME}...`} />;
