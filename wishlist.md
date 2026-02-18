@@ -1,4 +1,4 @@
-- Currently the animation when anlyzing report is basic button animation. I want a component for it. - done
+- Currently the animation when anlyzing report is basic button animation. I want a component for it. 
 - Currently, there is no way of knowing how many tokens I have and how many is used. - done
 - All the reports should be available at one seprate place also. - done
 - I want a sidebar where I will be adding more tools - done
@@ -7,4 +7,6 @@
 - add crisp on dashboard and site
 - add posthog analytics - very important.
 - Add icons currently using emojis
-- cancel folder create button in extension
+- cancel folder create button in extension - done
+- if analysis takes lot of time inform user he/she can leave tha page and we will notifiy him/her.
+- competitor research based based on keywords : toolname + frustating

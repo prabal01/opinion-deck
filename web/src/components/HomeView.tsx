@@ -17,7 +17,7 @@ import { PremiumLoader, ButtonLoader } from "./PremiumLoader";
 import { FolderList } from "./FolderList";
 import { ExtensionModal } from "./ExtensionModal";
 import { BRANDING } from "../constants/branding";
-import { AlertTriangle, Check, X, Activity, FolderOpen, FileText, Clock } from 'lucide-react';
+import { AlertTriangle, Check, X, Activity, FolderOpen, FileText, Clock, MessageSquare } from 'lucide-react';
 
 import { fetchUserStats } from "../lib/api";
 
@@ -240,8 +240,12 @@ export function HomeView() {
                         width: '100%'
                     }}>
                         <div className="metric-card" style={{ background: 'var(--card-bg)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <div className="label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}><Activity size={14} /> Intelligence Scanned</div>
-                            <div className="value" style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--primary-color)' }}>{stats?.intelligenceScanned || 0} <span style={{ fontSize: '0.9rem', opacity: 0.6, fontWeight: 'normal' }}>points</span></div>
+                            <div className="label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}><Activity size={14} /> Threads Scanned</div>
+                            <div className="value" style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--primary-color)' }}>{stats?.intelligenceScanned || 0}</div>
+                        </div>
+                        <div className="metric-card" style={{ background: 'var(--card-bg)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div className="label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}><MessageSquare size={14} /> Comments Analyzed</div>
+                            <div className="value" style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-main)' }}>{stats?.commentsAnalyzed || 0}</div>
                         </div>
                         <div className="metric-card" style={{ background: 'var(--card-bg)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <div className="label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}><FolderOpen size={14} /> Active Folders</div>

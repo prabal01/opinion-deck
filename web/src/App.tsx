@@ -41,7 +41,19 @@ function AppContent() {
       try {
         const token = await getIdToken();
         if (token) {
-          window.postMessage({ type: "OPINION_DECK_AUTH_TOKEN", token }, window.location.origin);
+          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          const apiUrl = import.meta.env.VITE_API_URL
+            ? import.meta.env.VITE_API_URL
+            : (isLocal ? 'http://localhost:3001/api' : 'https://opinion-deck.onrender.com/api');
+
+          const dashboardUrl = window.location.origin;
+
+          window.postMessage({
+            type: "OPINION_DECK_AUTH_TOKEN",
+            token,
+            apiUrl,
+            dashboardUrl
+          }, window.location.origin);
         }
       } catch (err) {
         console.warn("Failed to broadcast token to extension:", err);

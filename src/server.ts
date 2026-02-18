@@ -422,6 +422,11 @@ app.post("/api/folders/:id/analyze", async (req: express.Request, res: express.R
             return await analyzeThreads(threadsContext, folderContext);
         });
 
+        // Calculate total comments
+        const totalComments = savedThreads.reduce((sum, thread) => {
+            return sum + (thread.data.comments ? countComments(thread.data.comments) : 0);
+        }, 0);
+
         // 3. Save & Return
         const parsedResult = JSON.parse(analysisResult);
         // Inject timestamp for immediate frontend display
@@ -434,11 +439,19 @@ app.post("/api/folders/:id/analyze", async (req: express.Request, res: express.R
         await updateStats(req.user.uid, {
             reportsGenerated: 1,
             intelligenceScanned: savedThreads.length,
+            commentsAnalyzed: totalComments,
             // Estimate hours saved (approx 5 mins per thread manual reading)
             hoursSaved: parseFloat((savedThreads.length * 5 / 60).toFixed(1))
         });
 
-        res.json(parsedResult);
+        let responsePayload = parsedResult;
+
+        // Redact for Free Users immediately
+        if (req.user.plan === 'free') {
+            responsePayload = redactAnalysis(parsedResult);
+        }
+
+        res.json(responsePayload);
 
     } catch (err: any) {
         console.error("Analysis Error:", err);
@@ -464,18 +477,69 @@ function redactAnalysis(data: any): any {
         features: data.feature_requests?.length || 0
     };
 
-    // 1. Partial Unlocks (Top 3 Only)
-    if (data.themes) redacted.themes = data.themes.slice(0, 3);
-    if (data.pain_points) redacted.pain_points = data.pain_points.slice(0, 3);
+    // 2. Locked Lists (Stubbed)
+    if (data.themes) {
+        redacted.themes = data.themes.map(() => ({
+            title: "Locked Theme",
+            description: "This theme analysis is available on the Pro plan.",
+            confidence: 90,
+            citations: [],
+            isLocked: true
+        }));
+    }
 
-    // 2. Full Locks (High Value)
-    redacted.buying_intent_signals = [];
-    redacted.potential_leads = [];
-    redacted.engagement_opportunities = [];
-    redacted.feature_requests = [];
+    if (data.pain_points) {
+        redacted.pain_points = data.pain_points.map(() => ({
+            issue: "Hidden Pain Point",
+            severity: "Critical",
+            description: "This pain point analysis is exclusive to Pro users.",
+            isLocked: true
+        }));
+    }
+
+    // 2. Locked Lists (Stubbed)
+    if (data.potential_leads) {
+        redacted.potential_leads = data.potential_leads.map(() => ({
+            username: "Hidden Lead",
+            platform: "Social",
+            intent_context: "This high-value lead is available on the Pro plan.",
+            original_post_id: "locked",
+            isLocked: true
+        }));
+    }
+
+    if (data.buying_intent_signals) {
+        redacted.buying_intent_signals = data.buying_intent_signals.map(() => ({
+            signal: "Buying Signal",
+            context: "This purchasing intent signal is exclusive to Pro users.",
+            confidence: "High",
+            isLocked: true
+        }));
+    }
+
+    if (data.engagement_opportunities) {
+        redacted.engagement_opportunities = data.engagement_opportunities.map(() => ({
+            thread_id: "locked",
+            reason: "Engagement Opportunity",
+            talking_points: ["Locked talking point 1", "Locked talking point 2"],
+            isLocked: true
+        }));
+    }
+
+    // Feature requests can remain visible or partially locked? 
+    // User said "All the themes should be visible... just locked(main content)". 
+    // Let's lock features too for consistency if they are considered "High Value".
+    if (data.feature_requests) {
+        redacted.feature_requests = data.feature_requests.map(() => ({
+            feature: "Hidden Request",
+            frequency: "High",
+            context: "Unlock to see specific feature requests.",
+            isLocked: true
+        }));
+    }
 
     // 3. Curiosity Gaps
-    delete redacted.quality_reasoning;
+    // delete redacted.quality_reasoning; // User requested unlock
 
     // 4. Signal Flag
     redacted.isLocked = true;

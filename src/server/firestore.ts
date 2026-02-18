@@ -569,17 +569,18 @@ export interface UserStats {
     leadsIdentified: number;
     hoursSaved: number;
     intelligenceScanned: number;
+    commentsAnalyzed: number;
 }
 
 export async function getUserStats(uid: string): Promise<UserStats> {
     if (!db) {
-        return { threadsSaved: 0, reportsGenerated: 0, leadsIdentified: 0, hoursSaved: 0, intelligenceScanned: 0 };
+        return { threadsSaved: 0, reportsGenerated: 0, leadsIdentified: 0, hoursSaved: 0, intelligenceScanned: 0, commentsAnalyzed: 0 };
     }
     const doc = await db.collection("users").doc(uid).collection("stats").doc("summary").get();
     if (doc.exists) {
         return doc.data() as UserStats;
     }
-    return { threadsSaved: 0, reportsGenerated: 0, leadsIdentified: 0, hoursSaved: 0, intelligenceScanned: 0 };
+    return { threadsSaved: 0, reportsGenerated: 0, leadsIdentified: 0, hoursSaved: 0, intelligenceScanned: 0, commentsAnalyzed: 0 };
 }
 
 export async function updateStats(uid: string, updates: Partial<UserStats>): Promise<void> {

@@ -55,8 +55,26 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
     }
 });
 
-// Handle data analysis requests
+// Handle internal messages (Content Scripts -> Background)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    // 0. Handle Auth Token Sync (from dashboard.ts bridge)
+    if (request.type === 'OPINION_DECK_AUTH_TOKEN') {
+        const { token, apiUrl, dashboardUrl } = request; // Properties from event.data
+
+        console.log('[OpinionDeck] Received Auth Token from Dashboard Bridge');
+
+        chrome.storage.local.set({
+            'opinion_deck_token': token,
+            // Fallback defaults if not provided (App.tsx currently only sends token)
+            'opinion_deck_api_url': apiUrl || 'https://opinion-deck.onrender.com',
+            'opinion_deck_dashboard_url': dashboardUrl || 'https://app.opiniondeck.com'
+        }, () => {
+            console.log("[OpinionDeck] Extension Auth Sync: Success");
+            sendResponse({ status: 'success' });
+        });
+        return true;
+    }
+
     if (request.action === 'SAVE_EXTRACTION') {
         saveToBackend(request.data)
             .then(res => sendResponse({ status: 'success', res }))

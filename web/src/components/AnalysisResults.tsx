@@ -8,24 +8,28 @@ interface Theme {
     confidence: number;
     sentiment: "Positive" | "Neutral" | "Negative";
     citations: string[];
+    isLocked?: boolean;
 }
 
 interface FeatureRequest {
     feature: string;
     frequency: "High" | "Medium" | "Low";
     context: string;
+    isLocked?: boolean;
 }
 
 interface PainPoint {
     issue: string;
     severity: "Critical" | "Major" | "Minor";
     description: string;
+    isLocked?: boolean;
 }
 
 interface BuyingSignal {
     signal: string;
     context: string;
     confidence: "High" | "Medium" | "Low";
+    isLocked?: boolean;
 }
 
 interface PotentialLead {
@@ -33,12 +37,14 @@ interface PotentialLead {
     platform: string;
     intent_context: string;
     original_post_id: string;
+    isLocked?: boolean;
 }
 
 interface EngagementOpportunity {
     thread_id: string;
     reason: string;
     talking_points: string[];
+    isLocked?: boolean;
 }
 
 interface AnalysisData {
@@ -71,48 +77,106 @@ interface AnalysisData {
     };
 }
 
-const LockedBlur: React.FC<{ title: string; count: number }> = ({ title, count }) => {
+const LockedBlur: React.FC<{ title: string; count: number; type?: 'leads' | 'signals' | 'general' }> = ({ title, count, type = 'general' }) => {
     return (
         <div className="locked-blur-container" style={{
             position: 'relative',
             overflow: 'hidden',
-            borderRadius: '12px',
-            background: 'var(--bg-secondary)',
+            borderRadius: '16px',
+            background: 'var(--bg-card)',
             border: '1px solid var(--border-light)',
-            padding: '20px',
-            textAlign: 'center',
-            marginTop: '15px'
+            marginTop: '20px',
+            boxShadow: 'inset 0 0 20px rgba(0,0,0,0.2)'
         }}>
-            {/* Blur Effect Layer */}
-            <div style={{ filter: 'blur(6px)', opacity: 0.5, userSelect: 'none', pointerEvents: 'none' }}>
-                <div style={{ height: '16px', width: '80%', background: 'var(--text-secondary)', marginBottom: '12px', borderRadius: '4px' }}></div>
-                <div style={{ height: '16px', width: '60%', background: 'var(--text-secondary)', marginBottom: '12px', borderRadius: '4px' }}></div>
-                <div style={{ height: '16px', width: '90%', background: 'var(--text-secondary)', marginBottom: '12px', borderRadius: '4px' }}></div>
+            {/* Fake Content Layer */}
+            <div style={{ padding: '20px', filter: 'blur(8px)', opacity: 0.4, userSelect: 'none', pointerEvents: 'none' }}>
+                {type === 'leads' ? (
+                    // Fake Leads Rows
+                    [1, 2, 3].map(i => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
+                            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--text-secondary)' }}></div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ width: '40%', height: '14px', background: 'var(--text-secondary)', marginBottom: '8px', borderRadius: '4px' }}></div>
+                                <div style={{ width: '80%', height: '10px', background: 'var(--text-secondary)', opacity: 0.6, borderRadius: '4px' }}></div>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    // Fake Text Rows
+                    [1, 2, 3].map(i => (
+                        <div key={i} style={{ marginBottom: '20px' }}>
+                            <div style={{ width: '25%', height: '12px', background: 'var(--text-secondary)', marginBottom: '10px', borderRadius: '4px' }}></div>
+                            <div style={{ width: '90%', height: '10px', background: 'var(--text-secondary)', opacity: 0.6, marginBottom: '6px', borderRadius: '4px' }}></div>
+                            <div style={{ width: '70%', height: '10px', background: 'var(--text-secondary)', opacity: 0.6, borderRadius: '4px' }}></div>
+                        </div>
+                    ))
+                )}
             </div>
 
-            {/* Overlay Content */}
+            {/* Overlay Gradient */}
+            <div style={{
+                position: 'absolute',
+                top: 0, left: 0, right: 0, bottom: 0,
+                background: 'linear-gradient(to bottom, transparent 0%, var(--bg-card) 90%)',
+                zIndex: 1
+            }} />
+
+            {/* Upsell Card */}
             <div style={{
                 position: 'absolute',
                 top: 0, left: 0, right: 0, bottom: 0,
                 display: 'flex', flexDirection: 'column',
                 alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(15, 15, 20, 0.6)',
-                backdropFilter: 'blur(2px)'
+                zIndex: 2,
+                padding: '20px'
             }}>
                 <div style={{
-                    background: 'rgba(255,255,255,0.1)',
-                    backdropFilter: 'blur(10px)',
-                    padding: '20px 40px',
-                    borderRadius: '16px',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px'
+                    background: 'rgba(30, 30, 40, 0.70)',
+                    backdropFilter: 'blur(16px)',
+                    WebkitBackdropFilter: 'blur(16px)',
+                    padding: '30px 40px',
+                    borderRadius: '24px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
+                    maxWidth: '400px',
+                    width: '100%',
+                    transform: 'translateY(10px)'
                 }}>
-                    <span style={{ fontSize: '1.5rem' }}>🔒</span>
-                    <h4 style={{ margin: 0, color: 'white' }}>Unlock {count > 0 ? count : ''} High-Value {title}</h4>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#a0a0b8' }}>Upgrade to Pro to see the full details.</p>
-                    <a href="/pricing" className="btn-primary" style={{ padding: '8px 20px', fontSize: '0.9rem', textDecoration: 'none' }}>
-                        Upgrade Now
+                    <div style={{
+                        fontSize: '2rem',
+                        background: 'rgba(255,255,255,0.05)',
+                        width: '60px', height: '60px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        borderRadius: '50%',
+                        marginBottom: '4px',
+                        border: '1px solid rgba(255,255,255,0.1)'
+                    }}>
+                        🔒
+                    </div>
+
+                    <div style={{ textAlign: 'center' }}>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700, color: 'white' }}>
+                            Unlock {count > 0 ? count : ''} Hidden {title}
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '0.9rem', color: '#a0a0b8', lineHeight: 1.5 }}>
+                            Upgrade to Pro to reveal high-value signals and leads detected in this thread.
+                        </p>
+                    </div>
+
+                    <a href="/pricing" className="btn-primary" style={{
+                        padding: '12px 32px',
+                        fontSize: '1rem',
+                        textDecoration: 'none',
+                        background: 'linear-gradient(135deg, #FF4500 0%, #FF8717 100%)',
+                        boxShadow: '0 4px 12px rgba(255, 69, 0, 0.3)',
+                        borderRadius: '12px',
+                        fontWeight: 600,
+                        width: '100%',
+                        textAlign: 'center',
+                        marginTop: '8px'
+                    }}>
+                        Unlock Full Report
                     </a>
                 </div>
             </div>
@@ -219,183 +283,377 @@ export const AnalysisResults: React.FC<{ data: AnalysisData, onCitationClick?: (
                 <p className="exec-summary">{data.executive_summary || "No summary available."}</p>
                 {data.relevance_explanation && (
                     <p className="relevance-note">
-                        <strong>Why this score?</strong> {data.relevance_explanation}
+                        <strong>Strategic Relevance:</strong> {data.relevance_explanation}
                     </p>
                 )}
             </div>
 
             <div className="analysis-grid">
                 {/* Potential Leads Section */}
-                {(data.potential_leads && data.potential_leads.length > 0) || (data.isLocked && (data.locked_counts?.leads || 0) > 0) ? (
+                {(data.potential_leads && data.potential_leads.length > 0) ? (
                     <div className="analysis-card leads-card" style={{ gridColumn: '1 / -1' }}>
                         <div className="card-header-accent outreach">📣 Potential Customer Outreach</div>
-                        <h3>High Intent Leads</h3>
-                        {data.isLocked ? (
-                            <LockedBlur title="Leads" count={data.locked_counts?.leads || 0} />
-                        ) : (
-                            <div className="leads-list-compact" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px', marginTop: '10px' }}>
-                                {data.potential_leads!.map((lead, i) => (
-                                    <div key={i} className="lead-item" style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                            <strong style={{ color: 'var(--primary-color)', fontSize: '0.9rem' }}>{lead.username}</strong>
-                                            <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', opacity: 0.5 }}>{lead.platform}</span>
-                                        </div>
-                                        <p style={{ fontSize: '0.8rem', margin: '0 0 8px 0', lineHeight: '1.4', opacity: 0.9 }}>{lead.intent_context}</p>
-                                        <button
-                                            className="btn-text"
-                                            onClick={() => onCitationClick && onCitationClick(lead.original_post_id)}
-                                            style={{ fontSize: '0.7rem', padding: 0 }}
-                                        >
-                                            View Source Post →
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        <h3>High Intent Leads ({data.potential_leads.length})</h3>
+
+                        <div className="leads-list-compact" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px', marginTop: '10px' }}>
+                            {data.potential_leads.map((lead, i) => (
+                                <div key={i} className="lead-item" style={{
+                                    background: 'rgba(255,255,255,0.03)',
+                                    padding: '12px',
+                                    borderRadius: '10px',
+                                    border: '1px solid var(--border-light)',
+                                    position: 'relative',
+                                    overflow: 'hidden'
+                                }}>
+                                    {lead.isLocked ? (
+                                        <>
+                                            <div style={{ filter: 'blur(5px)', opacity: 0.5, pointerEvents: 'none' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                                    <strong style={{ color: 'var(--primary-color)', fontSize: '0.9rem' }}>Hidden User</strong>
+                                                    <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', opacity: 0.5 }}>Social</span>
+                                                </div>
+                                                <p style={{ fontSize: '0.8rem', margin: '0 0 8px 0', lineHeight: '1.4', opacity: 0.9 }}>
+                                                    {lead.intent_context}
+                                                </p>
+                                                <button className="btn-text" style={{ fontSize: '0.7rem', padding: 0 }}>View Source Post →</button>
+                                            </div>
+
+                                            {/* Mini Lock Overlay */}
+                                            <div style={{
+                                                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                background: 'rgba(0,0,0,0.1)',
+                                                backdropFilter: 'blur(2px)'
+                                            }}>
+                                                <div style={{
+                                                    background: 'var(--bg-card)',
+                                                    padding: '8px 16px',
+                                                    borderRadius: '20px',
+                                                    border: '1px solid var(--border-light)',
+                                                    boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+                                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                                    fontSize: '0.8rem', fontWeight: 600
+                                                }}>
+                                                    🔒 Upgrade to Unlock
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                                <strong style={{ color: 'var(--primary-color)', fontSize: '0.9rem' }}>{lead.username}</strong>
+                                                <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', opacity: 0.5 }}>{lead.platform}</span>
+                                            </div>
+                                            <p style={{ fontSize: '0.8rem', margin: '0 0 8px 0', lineHeight: '1.4', opacity: 0.9 }}>{lead.intent_context}</p>
+                                            <button
+                                                className="btn-text"
+                                                onClick={() => onCitationClick && onCitationClick(lead.original_post_id)}
+                                                style={{ fontSize: '0.7rem', padding: 0 }}
+                                            >
+                                                View Source Post →
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 ) : null}
 
                 {/* Buying Intent Signals */}
-                {(data.buying_intent_signals && data.buying_intent_signals.length > 0) || (data.isLocked && (data.locked_counts?.intent || 0) > 0) ? (
+                {(data.buying_intent_signals && data.buying_intent_signals.length > 0) ? (
                     <div className="analysis-card buying-intent">
                         <div className="card-header-accent">🎯 High Value Signals</div>
-                        <h3>Buying Intent Detected</h3>
-                        {data.isLocked ? (
-                            <LockedBlur title="Intent Signals" count={data.locked_counts?.intent || 0} />
-                        ) : (
-                            <ul className="intent-list">
-                                {data.buying_intent_signals!.map((signal, i) => (
-                                    <li key={i} className="intent-item">
-                                        <div className="intent-header">
-                                            <span className="signal-type">{signal.signal}</span>
-                                            <span className={`confidence-tag ${signal.confidence.toLowerCase()}`}>
-                                                {signal.confidence} Confidence
-                                            </span>
-                                        </div>
-                                        <p>"{signal.context}"</p>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
+                        <h3>Buying Intent Detected ({data.buying_intent_signals.length})</h3>
+                        <ul className="intent-list">
+                            {data.buying_intent_signals.map((signal, i) => (
+                                <li key={i} className="intent-item" style={{ position: 'relative', overflow: 'hidden' }}>
+                                    {signal.isLocked ? (
+                                        <>
+                                            <div style={{ filter: 'blur(5px)', opacity: 0.5, pointerEvents: 'none' }}>
+                                                <div className="intent-header">
+                                                    <span className="signal-type">Hidden Signal</span>
+                                                    <span className="confidence-tag high">High Confidence</span>
+                                                </div>
+                                                <p>"{signal.context}"</p>
+                                            </div>
+                                            <div style={{
+                                                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            }}>
+                                                <div style={{
+                                                    background: 'var(--bg-card)',
+                                                    padding: '4px 12px',
+                                                    borderRadius: '20px',
+                                                    border: '1px solid var(--border-light)',
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                                    fontSize: '0.75rem', fontWeight: 600,
+                                                    display: 'flex', alignItems: 'center', gap: '6px'
+                                                }}>
+                                                    🔒 Upgrade to Unlock
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="intent-header">
+                                                <span className="signal-type">{signal.signal}</span>
+                                                <span className={`confidence-tag ${signal.confidence.toLowerCase()}`}>
+                                                    {signal.confidence} Confidence
+                                                </span>
+                                            </div>
+                                            <p>"{signal.context}"</p>
+                                        </>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                 ) : null}
 
                 {/* Engagement Opportunities */}
-                {(data.engagement_opportunities && data.engagement_opportunities.length > 0) || (data.isLocked && (data.locked_counts?.engagement || 0) > 0) ? (
+                {(data.engagement_opportunities && data.engagement_opportunities.length > 0) ? (
                     <div className="analysis-card engagement">
-                        <h3>💬 Engagement Opportunities</h3>
-                        {data.isLocked ? (
-                            <LockedBlur title="Engagement Tips" count={data.locked_counts?.engagement || 0} />
-                        ) : (
-                            <ul className="engagement-list">
-                                {data.engagement_opportunities!.map((opp, i) => (
-                                    <li key={i} className="engagement-item">
-                                        <strong>Why: {opp.reason}</strong>
-                                        <ul>
-                                            {opp.talking_points.map((tp, j) => (
-                                                <li key={j}>👉 {tp}</li>
-                                            ))}
-                                        </ul>
-                                        <button
-                                            className="btn-text"
-                                            onClick={() => onCitationClick && onCitationClick(opp.thread_id)}
-                                        >
-                                            View Thread →
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                ) : null}
-
-                {/* Feature Requests - Also Locked in strict mode? PRD says LOCKED. */}
-                {(data.feature_requests || []).length > 0 || (data.isLocked && (data.locked_counts?.features || 0) > 0) ? (
-                    <div className="analysis-card features">
-                        <h3>💡 Feature Requests</h3>
-                        {data.isLocked ? (
-                            <LockedBlur title="Feature Requests" count={data.locked_counts?.features || 0} />
-                        ) : (
-                            <ul className="feature-list">
-                                {(data.feature_requests || []).map((req, i) => (
-                                    <li key={i} className="feature-item">
-                                        <div className="feature-header">
-                                            <strong>{req.feature}</strong>
-                                            <span className={`freq-badge f-${(req.frequency || 'medium').toLowerCase()}`}>
-                                                {req.frequency} Freq
-                                            </span>
-                                        </div>
-                                        <p className="context">"{req.context}"</p>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                ) : null}
-
-                {/* Themes (Partial Unlock) */}
-                {(data.themes || []).length > 0 && (
-                    <div className="analysis-card themes">
-                        <h3>🏆 Top Themes {data.isLocked && "(Top 3)"}</h3>
-                        <ul className="theme-list">
-                            {(data.themes || []).map((theme, i) => (
-                                <li key={i} className="theme-item">
-                                    <div className="theme-header">
-                                        <span className="theme-title">{theme.title}</span>
-                                        <span className={`confidence-badge c-${Math.floor(theme.confidence / 10) * 10}`}>
-                                            {theme.confidence}% Conf.
-                                        </span>
-                                    </div>
-                                    <p>{theme.description}</p>
-                                    <div className="citations">
-                                        {(theme.citations || []).map(c => (
+                        <div className="card-header-accent" style={{ background: '#3b82f6' }}>💬 Engagement & Reply Tips</div>
+                        <h3>Engagement Opportunities ({data.engagement_opportunities.length})</h3>
+                        <ul className="engagement-list">
+                            {data.engagement_opportunities.map((opp, i) => (
+                                <li key={i} className="engagement-item" style={{ position: 'relative', overflow: 'hidden' }}>
+                                    {opp.isLocked ? (
+                                        <>
+                                            <div style={{ filter: 'blur(5px)', opacity: 0.5, pointerEvents: 'none' }}>
+                                                <div style={{ marginBottom: '8px' }}>
+                                                    <span style={{
+                                                        background: '#e0e7ff', color: '#4338ca',
+                                                        fontSize: '0.7rem', fontWeight: 700,
+                                                        padding: '2px 8px', borderRadius: '4px', textTransform: 'uppercase'
+                                                    }}>
+                                                        Hidden Opportunity
+                                                    </span>
+                                                </div>
+                                                <p style={{ fontWeight: 600, margin: '0 0 8px 0', opacity: 0.8 }}>
+                                                    This opportunity is locked.
+                                                </p>
+                                                <ul>
+                                                    <li>• Locked talking point strategy #1</li>
+                                                    <li>• Locked talking point strategy #2</li>
+                                                </ul>
+                                            </div>
+                                            <div style={{
+                                                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            }}>
+                                                <div style={{
+                                                    background: 'var(--bg-card)',
+                                                    padding: '4px 12px',
+                                                    borderRadius: '20px',
+                                                    border: '1px solid var(--border-light)',
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                                    fontSize: '0.75rem', fontWeight: 600,
+                                                    display: 'flex', alignItems: 'center', gap: '6px'
+                                                }}>
+                                                    🔒 Upgrade to Unlock
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div style={{ marginBottom: '8px' }}>
+                                                <span style={{
+                                                    background: '#e0e7ff', color: '#4338ca',
+                                                    fontSize: '0.7rem', fontWeight: 700,
+                                                    padding: '2px 8px', borderRadius: '4px', textTransform: 'uppercase'
+                                                }}>
+                                                    Reply Opportunity
+                                                </span>
+                                            </div>
+                                            <p style={{ fontWeight: 600, margin: '0 0 8px 0' }}>{opp.reason}</p>
+                                            <div style={{ background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px' }}>
+                                                <strong style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>SUGGESTED TALKING POINTS:</strong>
+                                                <ul style={{ margin: 0 }}>
+                                                    {opp.talking_points.map((tp, idx) => (
+                                                        <li key={idx}>• {tp}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
                                             <button
-                                                key={c}
-                                                className="citation-pill"
-                                                title="View source comment"
-                                                onClick={() => onCitationClick && onCitationClick(c)}
+                                                className="btn-text"
+                                                onClick={() => onCitationClick && onCitationClick(opp.thread_id)}
                                             >
-                                                {c.replace('ID:', '')}
+                                                Go to Comment →
                                             </button>
-                                        ))}
-                                    </div>
+                                        </>
+                                    )}
                                 </li>
                             ))}
                         </ul>
-                        {data.isLocked && (
-                            <div style={{ marginTop: '10px', textAlign: 'center', fontSize: '0.8rem', opacity: 0.7 }}>
-                                <a href="/pricing" style={{ color: 'var(--text-link)', textDecoration: 'none' }}>
-                                    ✨ Upgrade to unlock full theme analysis
-                                </a>
-                            </div>
-                        )}
+                    </div>
+                ) : null}
+
+                {/* Feature Requests */}
+                {(data.feature_requests && data.feature_requests.length > 0) ? (
+                    <div className="analysis-card features">
+                        <div className="card-header-accent" style={{ background: '#f59e0b' }}>💡 Feature Requests</div>
+                        <h3>Feature Requests Detected ({data.feature_requests.length})</h3>
+                        <ul className="feature-list">
+                            {data.feature_requests.map((req, i) => (
+                                <li key={i} className="feature-item" style={{ position: 'relative', overflow: 'hidden' }}>
+                                    {req.isLocked ? (
+                                        <>
+                                            <div style={{ filter: 'blur(5px)', opacity: 0.5, pointerEvents: 'none' }}>
+                                                <div className="feature-header">
+                                                    <strong>Hidden Feature Request</strong>
+                                                    <span className="freq-badge f-high">High Frequency</span>
+                                                </div>
+                                                <p className="context">"One of the most requested features..."</p>
+                                            </div>
+                                            <div style={{
+                                                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            }}>
+                                                <div style={{
+                                                    background: 'var(--bg-card)',
+                                                    padding: '4px 12px',
+                                                    borderRadius: '20px',
+                                                    border: '1px solid var(--border-light)',
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                                    fontSize: '0.75rem', fontWeight: 600,
+                                                    display: 'flex', alignItems: 'center', gap: '6px'
+                                                }}>
+                                                    🔒 Upgrade to Unlock
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="feature-header">
+                                                <strong>{req.feature}</strong>
+                                                <span className={`freq-badge f-${(req.frequency || 'medium').toLowerCase()}`}>
+                                                    {req.frequency} Freq
+                                                </span>
+                                            </div>
+                                            <p className="context">"{req.context}"</p>
+                                        </>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ) : null}
+
+                {/* Themes */}
+                {(data.themes || []).length > 0 && (
+                    <div className="analysis-card themes">
+                        <h3>🏆 Top Themes ({data.themes.length})</h3>
+                        <ul className="theme-list">
+                            {(data.themes || []).map((theme, i) => (
+                                <li key={i} className="theme-item" style={{ position: 'relative', overflow: 'hidden' }}>
+                                    {theme.isLocked ? (
+                                        <>
+                                            <div style={{ filter: 'blur(5px)', opacity: 0.5, pointerEvents: 'none' }}>
+                                                <div className="theme-header">
+                                                    <span className="theme-title">Hidden Theme Analysis</span>
+                                                    <span className="confidence-badge c-90">90% Conf.</span>
+                                                </div>
+                                                <p style={{ opacity: 0.8 }}>This deep-dive theme analysis is locked.</p>
+                                                <div className="citations">
+                                                    <span className="citation-pill">src</span>
+                                                    <span className="citation-pill">src</span>
+                                                </div>
+                                            </div>
+                                            <div style={{
+                                                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            }}>
+                                                <div style={{
+                                                    background: 'var(--bg-card)',
+                                                    padding: '4px 12px',
+                                                    borderRadius: '20px',
+                                                    border: '1px solid var(--border-light)',
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                                    fontSize: '0.75rem', fontWeight: 600,
+                                                    display: 'flex', alignItems: 'center', gap: '6px'
+                                                }}>
+                                                    🔒 Upgrade to Unlock
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="theme-header">
+                                                <span className="theme-title">{theme.title}</span>
+                                                <span className={`confidence-badge c-${Math.floor(theme.confidence / 10) * 10}`}>
+                                                    {theme.confidence}% Conf.
+                                                </span>
+                                            </div>
+                                            <p>{theme.description}</p>
+                                            <div className="citations">
+                                                {(theme.citations || []).map(c => (
+                                                    <button
+                                                        key={c}
+                                                        className="citation-pill"
+                                                        title="View source comment"
+                                                        onClick={() => onCitationClick && onCitationClick(c)}
+                                                    >
+                                                        {c.replace('ID:', '')}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                 )}
 
-                {/* Pain Points (Partial Unlock) */}
+                {/* Pain Points */}
                 {(data.pain_points || []).length > 0 && (
                     <div className="analysis-card pain-points">
-                        <h3>🐛 Pain Points & Bugs {data.isLocked && "(Top 3)"}</h3>
+                        <h3>🐛 Pain Points & Bugs ({data.pain_points.length})</h3>
                         <ul className="pain-list">
                             {(data.pain_points || []).map((pp, i) => (
-                                <li key={i} className="pain-item">
-                                    <div className="pain-header">
-                                        <strong>{pp.issue}</strong>
-                                        <span className={`severity-badge s-${(pp.severity || 'minor').toLowerCase()}`}>
-                                            {pp.severity}
-                                        </span>
-                                    </div>
-                                    <p>{pp.description}</p>
+                                <li key={i} className="pain-item" style={{ position: 'relative', overflow: 'hidden' }}>
+                                    {pp.isLocked ? (
+                                        <>
+                                            <div style={{ filter: 'blur(5px)', opacity: 0.5, pointerEvents: 'none' }}>
+                                                <div className="pain-header">
+                                                    <strong>Hidden Pain Point</strong>
+                                                    <span className="severity-badge s-critical">CRITICAL</span>
+                                                </div>
+                                                <p>This critical user pain point is locked.</p>
+                                            </div>
+                                            <div style={{
+                                                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            }}>
+                                                <div style={{
+                                                    background: 'var(--bg-card)',
+                                                    padding: '4px 12px',
+                                                    borderRadius: '20px',
+                                                    border: '1px solid var(--border-light)',
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                                    fontSize: '0.75rem', fontWeight: 600,
+                                                    display: 'flex', alignItems: 'center', gap: '6px'
+                                                }}>
+                                                    🔒 Upgrade to Unlock
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="pain-header">
+                                                <strong>{pp.issue}</strong>
+                                                <span className={`severity-badge s-${(pp.severity || 'minor').toLowerCase()}`}>
+                                                    {pp.severity}
+                                                </span>
+                                            </div>
+                                            <p>{pp.description}</p>
+                                        </>
+                                    )}
                                 </li>
                             ))}
                         </ul>
-                        {data.isLocked && (
-                            <div style={{ marginTop: '10px', textAlign: 'center', fontSize: '0.8rem', opacity: 0.7 }}>
-                                <a href="/pricing" style={{ color: 'var(--text-link)', textDecoration: 'none' }}>
-                                    ✨ Upgrade to see all user pain points
-                                </a>
-                            </div>
-                        )}
                     </div>
                 )}
             </div>

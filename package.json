@@ -10,7 +10,7 @@
     "build": "tsc",
     "build:cli": "tsup --watch",
     "start": "node dist/server.js",
-    "dev:server": "npx tsx --watch server.ts",
+    "dev:server": "npx tsx --watch src/server.ts",
     "dev:web": "cd web && npm run dev",
     "dev": "npx concurrently \"npm run dev:server\" \"npm run dev:web\""
   },
