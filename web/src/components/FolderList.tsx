@@ -27,7 +27,7 @@ const FolderCard: React.FC<FolderCardProps> = ({ folder, onClick }) => {
         <div className="folder-card" onClick={() => onClick(folder)}>
             <div className="folder-card-header">
                 <div className="folder-icon-wrapper">
-                    <FolderIcon size={24} />
+                    <FolderIcon size={20} />
                 </div>
                 <div className="folder-actions">
                     <button

@@ -2,11 +2,46 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { BRANDING } from '../constants/branding';
-import { LayoutDashboard, Folder, RefreshCw, Settings, Globe, Search } from 'lucide-react';
+import { LayoutDashboard, Folder, RefreshCw, Settings, Globe, Search, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
 
 export const Sidebar: React.FC = () => {
     const { plan, userStats } = useAuth();
     const navigate = useNavigate();
+    const [extensionConnected, setExtensionConnected] = useState<boolean | null>(null);
+
+    const pingExtension = useCallback(() => {
+        setExtensionConnected(null);
+        const requestId = "sidebar-ping-" + Math.random().toString(36).substring(7);
+
+        const handlePingResponse = (event: MessageEvent) => {
+            if (event.data.type === "OPINION_DECK_PING_RESPONSE" && event.data.id === requestId) {
+                setExtensionConnected(true);
+                window.removeEventListener('message', handlePingResponse);
+            }
+        };
+        window.addEventListener('message', handlePingResponse);
+
+        window.postMessage({
+            type: "OPINION_DECK_PING_REQUEST",
+            id: requestId
+        }, window.location.origin);
+
+        // If no response in 2s, assume not connected
+        const timeout = setTimeout(() => {
+            setExtensionConnected(current => current === null ? false : current);
+            window.removeEventListener('message', handlePingResponse);
+        }, 2000);
+
+        return () => {
+            clearTimeout(timeout);
+            window.removeEventListener('message', handlePingResponse);
+        };
+    }, []);
+
+    useEffect(() => {
+        return pingExtension();
+    }, [pingExtension]);
 
     const handleLogoClick = () => {
         navigate('/');
@@ -37,10 +72,37 @@ export const Sidebar: React.FC = () => {
             </nav>
 
             <div className="sidebar-footer">
-                <div className="extension-connection-info-sidebar">
-                    <div className="label">Extension Status</div>
+                <div className="extension-connection-info-sidebar" style={{
+                    padding: '12px',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    marginBottom: '16px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                }}>
+                    <div className="label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        Extension Status
+                        <button
+                            onClick={(e) => { e.preventDefault(); pingExtension(); }}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex' }}
+                            title="Refresh connection status"
+                        >
+                            <RefreshCw size={12} className={extensionConnected === null ? 'animate-spin' : ''} />
+                        </button>
+                    </div>
                     <div className="value">
-                        <span>{typeof window !== 'undefined' && (window as any).chrome?.runtime ? 'Connected' : 'Not Connected'}</span>
+                        {extensionConnected === null ? (
+                            <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <Loader2 size={12} className="animate-spin" /> Checking...
+                            </span>
+                        ) : extensionConnected ? (
+                            <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }}></div> Connected
+                            </span>
+                        ) : (
+                            <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444' }}></div> Not Connected
+                            </span>
+                        )}
                     </div>
                 </div>
                 <div className="credit-badge-sidebar">

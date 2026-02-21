@@ -228,30 +228,30 @@ export function HomeView() {
 
             {!thread && !loading && !error && (
                 <div className="dashboard-home">
-                    <header className="dashboard-header">
-                        <h1>Welcome to {BRANDING.NAME}</h1>
-                        <p className="subtitle">Your Strategic Market Intelligence Hub</p>
+                    <header className="dashboard-header" style={{ marginBottom: '16px' }}>
+                        <h1 style={{ fontSize: '1.75rem', marginBottom: '4px' }}>Welcome to {BRANDING.NAME}</h1>
+                        <p className="subtitle" style={{ fontSize: '0.95rem' }}>Your Strategic Market Intelligence Hub</p>
                     </header>
 
                     <div className="impact-metrics-grid" style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                        gap: '24px',
-                        margin: '40px 0',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                        gap: '16px',
+                        margin: '24px 0',
                         width: '100%'
                     }}>
                         {!stats ? (
                             <>
                                 {[1, 2, 3, 4].map(id => (
                                     <div key={id} className="metric-card" style={{
-                                        background: 'rgba(255, 255, 255, 0.03)',
+                                        background: 'rgba(255, 255, 255, 0.04)',
                                         backdropFilter: 'blur(12px)',
-                                        padding: '32px',
-                                        borderRadius: '24px',
+                                        padding: '20px',
+                                        borderRadius: '16px',
                                         border: '1px solid rgba(255, 255, 255, 0.1)',
                                         display: 'flex',
                                         flexDirection: 'column',
-                                        gap: '12px'
+                                        gap: '8px'
                                     }}>
                                         <Skeleton width="120px" height="16px" />
                                         <Skeleton width="100px" height="40px" style={{ marginTop: '8px' }} />
@@ -261,75 +261,75 @@ export function HomeView() {
                         ) : (
                             <>
                                 <div className="metric-card" style={{
-                                    background: 'rgba(255, 255, 255, 0.03)',
+                                    background: 'linear-gradient(135deg, rgba(255, 69, 0, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%)',
                                     backdropFilter: 'blur(12px)',
-                                    padding: '32px',
-                                    borderRadius: '24px',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    padding: '20px',
+                                    borderRadius: '16px',
+                                    border: '1px solid rgba(255, 69, 0, 0.2)',
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: '12px',
+                                    gap: '8px',
                                     transition: 'all 0.3s ease',
-                                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+                                    boxShadow: '0 8px 32px rgba(255, 69, 0, 0.1)'
                                 }}>
-                                    <div className="label" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '700', letterSpacing: '0.05em' }}>
-                                        <Activity size={16} color="var(--primary-color)" /> Intelligence Scanned
+                                    <div className="label" style={{ fontSize: '0.75rem', color: 'rgba(255, 69, 0, 0.8)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', letterSpacing: '0.08em' }}>
+                                        <Activity size={16} /> Intelligence Scanned
                                     </div>
-                                    <div className="value" style={{ fontSize: '2.5rem', fontWeight: '900', color: 'white' }}>{stats?.intelligenceScanned || 0}</div>
+                                    <div className="value" style={{ fontSize: '2rem', fontWeight: '900', color: 'white' }}>{stats?.intelligenceScanned || 0}</div>
                                 </div>
 
                                 <div className="metric-card" style={{
-                                    background: 'rgba(255, 255, 255, 0.03)',
+                                    background: 'linear-gradient(135deg, rgba(0, 209, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%)',
                                     backdropFilter: 'blur(12px)',
-                                    padding: '32px',
-                                    borderRadius: '24px',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    padding: '20px',
+                                    borderRadius: '16px',
+                                    border: '1px solid rgba(0, 209, 255, 0.2)',
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: '12px',
+                                    gap: '8px',
                                     transition: 'all 0.3s ease',
-                                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+                                    boxShadow: '0 8px 32px rgba(0, 209, 255, 0.1)'
                                 }}>
-                                    <div className="label" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '700', letterSpacing: '0.05em' }}>
-                                        <MessageSquare size={16} color="#00D1FF" /> Insights Found
+                                    <div className="label" style={{ fontSize: '0.75rem', color: 'rgba(0, 209, 255, 0.8)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', letterSpacing: '0.08em' }}>
+                                        <MessageSquare size={16} /> Insights Found
                                     </div>
-                                    <div className="value" style={{ fontSize: '2.5rem', fontWeight: '900', color: 'white' }}>{stats?.commentsAnalyzed || 0}</div>
+                                    <div className="value" style={{ fontSize: '2rem', fontWeight: '900', color: 'white' }}>{stats?.commentsAnalyzed || 0}</div>
                                 </div>
 
                                 <div className="metric-card" style={{
-                                    background: 'rgba(255, 255, 255, 0.03)',
+                                    background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%)',
                                     backdropFilter: 'blur(12px)',
-                                    padding: '32px',
-                                    borderRadius: '24px',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    padding: '20px',
+                                    borderRadius: '16px',
+                                    border: '1px solid rgba(168, 85, 247, 0.2)',
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: '12px',
+                                    gap: '8px',
                                     transition: 'all 0.3s ease',
-                                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+                                    boxShadow: '0 8px 32px rgba(168, 85, 247, 0.1)'
                                 }}>
-                                    <div className="label" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '700', letterSpacing: '0.05em' }}>
-                                        <FolderOpen size={16} color="#A855F7" /> Strategy Folders
+                                    <div className="label" style={{ fontSize: '0.75rem', color: 'rgba(168, 85, 247, 0.8)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', letterSpacing: '0.08em' }}>
+                                        <FolderOpen size={16} /> Strategy Folders
                                     </div>
-                                    <div className="value" style={{ fontSize: '2.5rem', fontWeight: '900', color: 'white' }}>{folders.length}</div>
+                                    <div className="value" style={{ fontSize: '2rem', fontWeight: '900', color: 'white' }}>{folders.length}</div>
                                 </div>
 
                                 <div className="metric-card" style={{
-                                    background: 'rgba(255, 255, 255, 0.03)',
+                                    background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%)',
                                     backdropFilter: 'blur(12px)',
-                                    padding: '32px',
-                                    borderRadius: '24px',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    padding: '20px',
+                                    borderRadius: '16px',
+                                    border: '1px solid rgba(234, 179, 8, 0.2)',
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: '12px',
+                                    gap: '8px',
                                     transition: 'all 0.3s ease',
-                                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+                                    boxShadow: '0 8px 32px rgba(234, 179, 8, 0.1)'
                                 }}>
-                                    <div className="label" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '700', letterSpacing: '0.05em' }}>
-                                        <Clock size={16} color="var(--warning-color)" /> Hours Saved
+                                    <div className="label" style={{ fontSize: '0.75rem', color: 'rgba(234, 179, 8, 0.8)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', letterSpacing: '0.08em' }}>
+                                        <Clock size={16} /> Hours Saved
                                     </div>
-                                    <div className="value" style={{ fontSize: '2.5rem', fontWeight: '900', color: 'white' }}>{(stats?.hoursSaved || 0).toFixed(1)} <span style={{ fontSize: '1rem', opacity: 0.5 }}>h</span></div>
+                                    <div className="value" style={{ fontSize: '2rem', fontWeight: '900', color: 'white' }}>{(stats?.hoursSaved || 0).toFixed(1)} <span style={{ fontSize: '1rem', opacity: 0.5 }}>h</span></div>
                                 </div>
                             </>
                         )}
