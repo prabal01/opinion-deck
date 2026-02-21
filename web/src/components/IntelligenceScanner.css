@@ -1,0 +1,345 @@
+.intelligence-scanner-container {
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 24px;
+    margin-bottom: 3rem;
+    animation: scannerFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+@keyframes scannerFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.scanner-card {
+    display: flex;
+    align-items: center;
+    gap: 3rem;
+    max-width: 800px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+}
+
+/* VISUAL SECTION */
+.scanner-visual {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    flex-shrink: 0;
+}
+
+.orb-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.orb-core {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, var(--bg-accent) 0%, #FF8717 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    z-index: 2;
+    box-shadow: 0 0 40px rgba(255, 69, 0, 0.4);
+    position: relative;
+}
+
+.brain-icon {
+    animation: brainThrob 2s infinite ease-in-out;
+}
+
+@keyframes brainThrob {
+
+    0%,
+    100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 0px #fff);
+    }
+
+    50% {
+        transform: scale(1.1);
+        filter: drop-shadow(0 0 8px #fff);
+    }
+}
+
+.orb-pulse {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: rgba(255, 69, 0, 0.2);
+    animation: orbPulse 2s infinite ease-out;
+    z-index: 1;
+}
+
+@keyframes orbPulse {
+    0% {
+        transform: scale(0.6);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(1.4);
+        opacity: 0;
+    }
+}
+
+.scan-line {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(to right, transparent, white, transparent);
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
+    animation: scanAnimation 3s infinite linear;
+    z-index: 3;
+    pointer-events: none;
+}
+
+@keyframes scanAnimation {
+    0% {
+        top: 0;
+        opacity: 0;
+    }
+
+    10% {
+        opacity: 1;
+    }
+
+    90% {
+        opacity: 1;
+    }
+
+    100% {
+        top: 100%;
+        opacity: 0;
+    }
+}
+
+/* DATA STREAM EFFECT */
+.data-stream {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.data-bit {
+    position: absolute;
+    font-size: 0.6rem;
+    font-weight: 900;
+    font-family: monospace;
+    color: var(--bg-accent);
+    opacity: 0;
+}
+
+.bit-0 {
+    top: 10%;
+    left: -20%;
+    animation: dataFloat 2s infinite 0.1s;
+}
+
+.bit-1 {
+    top: 40%;
+    left: 110%;
+    animation: dataFloat 2s infinite 0.5s;
+}
+
+.bit-2 {
+    top: 80%;
+    left: -10%;
+    animation: dataFloat 2s infinite 0.9s;
+}
+
+.bit-3 {
+    top: 20%;
+    left: 100%;
+    animation: dataFloat 2s infinite 1.3s;
+}
+
+.bit-4 {
+    top: 60%;
+    left: -30%;
+    animation: dataFloat 2s infinite 1.7s;
+}
+
+.bit-5 {
+    top: 90%;
+    left: 120%;
+    animation: dataFloat 2s infinite 0.3s;
+}
+
+@keyframes dataFloat {
+    0% {
+        transform: translateY(10px);
+        opacity: 0;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
+
+    100% {
+        transform: translateY(-30px);
+        opacity: 0;
+    }
+}
+
+/* INFO SECTION */
+.scanner-info {
+    flex: 1;
+}
+
+.scanner-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 1rem;
+}
+
+.sparkle-icon {
+    color: var(--primary-color);
+    animation: sparkleSpin 3s infinite linear;
+}
+
+@keyframes sparkleSpin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.scanner-header h3 {
+    font-size: 1.25rem;
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: -0.02em;
+    color: white;
+}
+
+.message-container {
+    height: 24px;
+    margin-bottom: 1.5rem;
+}
+
+.scanner-message {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    margin: 0;
+    animation: messageShift 0.3s ease-out;
+}
+
+@keyframes messageShift {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* PROGRESS BAR */
+.progress-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.progress-bar-wrapper {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(to right, var(--bg-accent), #FF8717);
+    border-radius: 3px;
+    box-shadow: 0 0 10px rgba(255, 69, 0, 0.5);
+    transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.progress-percentage {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    width: 40px;
+}
+
+/* TIMEOUT NOTICE */
+.scanner-timeout-notice {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: rgba(var(--primary-rgb, 255, 69, 0), 0.05);
+    border: 1px solid rgba(var(--primary-rgb, 255, 69, 0), 0.15);
+    border-radius: 12px;
+    display: flex;
+    gap: 12px;
+    animation: noticeSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes noticeSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.notice-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(var(--primary-rgb, 255, 69, 0), 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-color);
+    flex-shrink: 0;
+}
+
+.notice-content p {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.notice-content strong {
+    color: white;
+    display: block;
+    margin-bottom: 2px;
+}

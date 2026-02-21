@@ -11,6 +11,7 @@ import './AnalysisResults.css';
 import { fetchFolderAnalysis } from '../lib/api';
 import { AlertTriangle, Sparkles, Trash2, BarChart2, ArrowDownCircle, Calendar, MessageSquare as MessageSquareIcon, Users, ExternalLink, FileDown } from 'lucide-react';
 import { exportReportToPDF } from '../lib/pdfExport';
+import { IntelligenceScanner } from './IntelligenceScanner';
 
 interface SavedThread {
     id: string;
@@ -124,26 +125,7 @@ export const FolderDetail: React.FC = () => {
         }
     };
 
-    const [loadingMsg, setLoadingMsg] = useState("Initializing AI...");
-
-    useEffect(() => {
-        if (!isAnalyzing) return;
-        const messages = [
-            "Reading executive summary...",
-            "Identifying top themes...",
-            "Extracting feature requests...",
-            "Locating pain points & bugs...",
-            "Calculating sentiment scores...",
-            "Finalizing research report..."
-        ];
-        let i = 0;
-        setLoadingMsg(messages[0]);
-        const interval = setInterval(() => {
-            i = (i + 1) % messages.length;
-            setLoadingMsg(messages[i]);
-        }, 2000);
-        return () => clearInterval(interval);
-    }, [isAnalyzing]);
+    // Messaging logic moved to IntelligenceScanner component
 
     const handleAnalyze = async () => {
         if (!folderId || threads.length === 0) return;
@@ -283,7 +265,7 @@ export const FolderDetail: React.FC = () => {
                             {isAnalyzing ? (
                                 <>
                                     <ButtonLoader />
-                                    {loadingMsg}
+                                    Analyzing...
                                 </>
                             ) : (
                                 <>{analyses.length > 0 ? <><Sparkles size={18} /> Re-Analyze Intelligence</> : <><Sparkles size={18} /> Generate AI Intelligence</>}</>
@@ -335,6 +317,8 @@ export const FolderDetail: React.FC = () => {
                     <p>{analysisError}</p>
                 </div>
             )}
+
+            <IntelligenceScanner isAnalyzing={isAnalyzing} />
 
             {analyses.length > 0 && (
                 <div className="analysis-feed">
