@@ -9,7 +9,7 @@ import { Skeleton } from './Skeleton';
 import './Folders.css';
 import './AnalysisResults.css';
 import { fetchFolderAnalysis } from '../lib/api';
-import { AlertTriangle, Sparkles, Trash2, BarChart2, ArrowDownCircle, Calendar, MessageSquare as MessageSquareIcon, Users, ExternalLink, FileDown, Zap } from 'lucide-react';
+import { AlertTriangle, Sparkles, Trash2, BarChart2, ArrowDownCircle, Calendar, MessageSquare as MessageSquareIcon, Users, ExternalLink, FileDown, Zap, Loader2 } from 'lucide-react';
 import { exportReportToPDF } from '../lib/pdfExport';
 import { IntelligenceScanner } from './IntelligenceScanner';
 
@@ -35,7 +35,7 @@ export const FolderDetail: React.FC = () => {
     // Handle "inbox" virtual folder
     const folder = folderId === 'inbox'
         ? { id: 'inbox', name: 'Inbox', description: 'Unorganized threads', createdAt: new Date().toISOString(), threadCount: 0, uid: '' }
-        : folders.find(f => f.id === folderId);
+        : folders.find((f: any) => f.id === folderId);
 
     const [threads, setThreads] = useState<SavedThread[]>([]);
     const [loading, setLoading] = useState(true);
@@ -89,7 +89,7 @@ export const FolderDetail: React.FC = () => {
 
         let mounted = true;
         setLoading(true);
-        getFolderThreads(folderId).then(data => {
+        getFolderThreads(folderId).then((data: any) => {
             if (mounted) {
                 setThreads(data);
                 setLoading(false);
@@ -266,7 +266,7 @@ export const FolderDetail: React.FC = () => {
                         <button
                             className="btn-primary analyze-btn"
                             onClick={handleAnalyze}
-                            disabled={isAnalyzing}
+                            disabled={isAnalyzing || folder.syncStatus === 'syncing'}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -284,6 +284,11 @@ export const FolderDetail: React.FC = () => {
                                 <>
                                     <ButtonLoader />
                                     Analyzing...
+                                </>
+                            ) : folder.syncStatus === 'syncing' ? (
+                                <>
+                                    <Loader2 size={18} className="animate-spin" />
+                                    Syncing Threads...
                                 </>
                             ) : (
                                 <>{analyses.length > 0 ? <><Sparkles size={18} /> Re-Analyze Intelligence</> : <><Sparkles size={18} /> Generate AI Intelligence</>}</>
@@ -308,6 +313,24 @@ export const FolderDetail: React.FC = () => {
                         <BarChart2 size={24} />
                     </div>
                     <h2 style={{ fontSize: '2.5rem', fontWeight: '900', margin: 0, letterSpacing: '-0.04em', color: 'white' }}>{folder.name}</h2>
+                    {folder.syncStatus === 'syncing' && (
+                        <div className="syncing-badge" style={{
+                            background: 'rgba(59, 130, 246, 0.1)',
+                            color: '#3b82f6',
+                            padding: '6px 14px',
+                            borderRadius: '12px',
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            border: '1px solid rgba(59, 130, 246, 0.2)',
+                            marginLeft: '10px'
+                        }}>
+                            <Loader2 size={14} className="animate-spin" />
+                            BACKGROUND SYNCING
+                        </div>
+                    )}
                 </div>
                 {folder.description && <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', maxWidth: '800px', lineHeight: '1.6', margin: '0 0 24px 0' }}>{folder.description}</p>}
 

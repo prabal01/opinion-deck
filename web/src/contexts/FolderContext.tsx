@@ -10,6 +10,8 @@ export interface Folder {
     color?: string;
     createdAt: string;
     threadCount: number;
+    syncStatus?: 'idle' | 'syncing';
+    pendingSyncCount?: number;
 }
 
 interface FolderContextType {
@@ -22,6 +24,7 @@ interface FolderContextType {
     saveThread: (folderId: string, threadData: any) => Promise<void>;
     getFolderThreads: (folderId: string) => Promise<any[]>;
     analyzeFolder: (folderId: string) => Promise<any>;
+    syncThreads: (folderId: string, urls: string[]) => Promise<void>;
 }
 
 const FolderContext = createContext<FolderContextType | undefined>(undefined);
@@ -152,6 +155,31 @@ export const FolderProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
     };
 
+    const syncThreads = async (folderId: string, urls: string[]) => {
+        if (!user) throw new Error('Not authenticated');
+        try {
+            const token = await getIdToken();
+            const res = await fetch(`${API_BASE}/folders/${folderId}/sync`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ urls })
+            });
+
+            if (!res.ok) throw new Error('Failed to initiate sync');
+
+            // Update local folder state to syncing
+            setFolders(prev => prev.map(f =>
+                f.id === folderId ? { ...f, syncStatus: 'syncing' } : f
+            ));
+        } catch (err: any) {
+            setError(err.message);
+            throw err;
+        }
+    };
+
     useEffect(() => {
         fetchFolders();
     }, [fetchFolders]);
@@ -166,7 +194,8 @@ export const FolderProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             deleteFolder,
             saveThread,
             getFolderThreads,
-            analyzeFolder
+            analyzeFolder,
+            syncThreads
         }}>
             {children}
         </FolderContext.Provider>

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useFolders } from '../contexts/FolderContext';
-import { Search, Info, Check, ArrowRight, Loader2, MessageSquare, ThumbsUp } from 'lucide-react';
+import { Search, Info, Check, ArrowRight, Loader2, MessageSquare, ThumbsUp, ExternalLink } from 'lucide-react';
 import './ResearchView.css';
 
 interface DiscoveryResult {
@@ -12,10 +12,21 @@ interface DiscoveryResult {
     ups: number;
     num_comments: number;
     score: number;
+    isCached?: boolean;
+}
+
+interface DiscoveryPlan {
+    scannedCount: number;
+    totalFound: number;
+    cachedCount: number;
+    newCount: number;
+    estimatedSyncTime: number;
+    isFromCache?: boolean;
+    recommendedPath?: string[];
 }
 
 export const ResearchView: React.FC = () => {
-    const { folders, createFolder } = useFolders();
+    const { folders, createFolder, syncThreads } = useFolders();
     const [competitor, setCompetitor] = useState('');
     const [results, setResults] = useState<DiscoveryResult[]>([]);
     const [loading, setLoading] = useState(false);
@@ -28,6 +39,12 @@ export const ResearchView: React.FC = () => {
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
     const [isSearchingStarted, setIsSearchingStarted] = useState(false);
+    const [deepDiscovery, setDeepDiscovery] = useState(false);
+    const [discoveryPlan, setDiscoveryPlan] = useState<DiscoveryPlan | null>(null);
+
+    // Debug mode check from URL params
+    const searchParams = new URLSearchParams(window.location.search);
+    const isDebugMode = searchParams.get('debug') === 'true';
 
     // Ping extension on mount
     useEffect(() => {
@@ -86,10 +103,15 @@ export const ResearchView: React.FC = () => {
         setIsSearchingStarted(true);
         setLoading(true);
         setResults([]);
+        setDiscoveryPlan(null);
         setSelectedIds(new Set());
         setStatus(null);
 
-        const steps = [
+        // MODE: We can choose based on user plan or toggle in the future
+        // For now, we prefer backend as per implementation plan, but keep extension code as fallback
+        const usePluginDiscovery = false; // Set to true to use extension logic
+
+        const steps = usePluginDiscovery ? [
             { id: 'ext', label: 'Checking extension connectivity', status: 'loading' as const },
             { id: 'query', label: 'Generating surgical search queries', status: 'pending' as const },
             { id: 'pains', label: 'Scanning competitor pain points', status: 'pending' as const },
@@ -99,81 +121,137 @@ export const ResearchView: React.FC = () => {
             { id: 'filter', label: 'Filtering noise & promotional signal', status: 'pending' as const },
             { id: 'weights', label: 'Calibrating relevance weights', status: 'pending' as const },
             { id: 'dashboard', label: 'Preparing intelligence dashboard', status: 'pending' as const }
+        ] : [
+            { id: 'connect', label: 'Connecting to discovery engine', status: 'loading' as const },
+            { id: 'api_check', label: deepDiscovery ? 'Initializing Deep Search Queue' : 'Verifying Google indices', status: 'pending' as const },
+            { id: 'fetch', label: deepDiscovery ? 'Scraping Reddit communities' : 'Scanning competitor mentions', status: 'pending' as const },
+            { id: 'enrich', label: 'Enriching with engagement metadata', status: 'pending' as const },
+            { id: 'rank', label: 'Ranking by intent and relevance', status: 'pending' as const },
+            { id: 'final', label: 'Preparing intelligence dashboard', status: 'pending' as const }
         ];
         setLoadingSteps(steps);
 
-        if (extensionConnected === false) {
-            setTimeout(() => {
-                setLoadingSteps(prev => prev.map(s => s.id === 'ext' ? { ...s, status: 'error', label: 'Extension not detected' } : s));
-                setStatus("Please install or enable the extension to perform discovery.");
-            }, 800);
-            return;
-        }
-
-        const requestId = Math.random().toString(36).substring(7);
-
-        const handleProgress = (event: MessageEvent) => {
-            if (event.data.type === "OPINION_DECK_DISCOVERY_PROGRESS") {
-                const { stepId, results: finalResults } = event.data;
-
-                if (stepId === 'results_ready' && finalResults) {
-                    setResults(finalResults);
-                    setLoadingSteps(prev => prev.map(s => ({ ...s, status: 'complete' as const })));
-                    if (finalResults.length === 0) setStatus("No relevant threads found. Try a different name.");
-                    setTimeout(() => setLoading(false), 800);
-                    // Don't remove listener yet, might get more updates? No, results_ready is final.
-                    return;
-                }
-
-                setLoadingSteps(prev => {
-                    const stepIndex = prev.findIndex(s => s.id === stepId);
-                    if (stepIndex === -1) return prev;
-                    return prev.map((s, idx) => {
-                        if (idx < stepIndex) return { ...s, status: 'complete' as const };
-                        if (idx === stepIndex) return { ...s, status: 'loading' as const };
-                        return s;
-                    });
-                });
+        if (usePluginDiscovery) {
+            // RESTORED PLUGIN CODE
+            if (extensionConnected === false) {
+                setTimeout(() => {
+                    setLoadingSteps(prev => prev.map(s => s.id === 'ext' ? { ...s, status: 'error', label: 'Extension not detected' } : s));
+                    setStatus("Please install or enable the extension to perform discovery.");
+                }, 800);
+                return;
             }
-        };
 
-        const handleMessage = (event: MessageEvent) => {
-            if (event.data.type === "OPINION_DECK_DISCOVERY_RESPONSE" && event.data.id === requestId) {
-                if (event.data.success) {
-                    // If sidepanel is taking over, don't stop loading or remove listeners yet
-                    if (event.data.sidepanel) {
-                        setLoadingSteps(prev => prev.map(s => s.id === 'ext' ? { ...s, status: 'complete' } : s.id === 'query' ? { ...s, status: 'loading' } : s));
-                        // We keep handleProgress active to receive updates from the extension
+            const requestId = Math.random().toString(36).substring(7);
+
+            const handleProgress = (event: MessageEvent) => {
+                if (event.data.type === "OPINION_DECK_DISCOVERY_PROGRESS") {
+                    const { stepId, results: finalResults } = event.data;
+                    if (stepId === 'results_ready' && finalResults) {
+                        setResults(finalResults);
+                        setLoadingSteps(prev => prev.map(s => ({ ...s, status: 'complete' as const })));
+                        if (finalResults.length === 0) setStatus("No relevant threads found. Try a different name.");
+                        setTimeout(() => setLoading(false), 800);
                         return;
                     }
+                    setLoadingSteps(prev => {
+                        const stepIndex = prev.findIndex(s => s.id === stepId);
+                        if (stepIndex === -1) return prev;
+                        return prev.map((s, idx) => {
+                            if (idx < stepIndex) return { ...s, status: 'complete' as const };
+                            if (idx === stepIndex) return { ...s, status: 'loading' as const };
+                            return s;
+                        });
+                    });
+                }
+            };
 
-                    setLoadingSteps(prev => prev.map(s => ({ ...s, status: 'complete' })));
-                    setResults(event.data.results || []);
-                    if (event.data.results.length === 0) {
-                        setStatus("No relevant threads found. Try a different competitor name.");
+            const handleMessage = (event: MessageEvent) => {
+                if (event.data.type === "OPINION_DECK_DISCOVERY_RESPONSE" && event.data.id === requestId) {
+                    if (event.data.success) {
+                        if (event.data.sidepanel) {
+                            setLoadingSteps(prev => prev.map(s => s.id === 'ext' ? { ...s, status: 'complete' } : s.id === 'query' ? { ...s, status: 'loading' } : s));
+                            return;
+                        }
+                        setLoadingSteps(prev => prev.map(s => ({ ...s, status: 'complete' })));
+                        setResults(event.data.results || []);
+                        if (event.data.results.length === 0) setStatus("No relevant threads found. Try a different competitor name.");
+                        setTimeout(() => setLoading(false), 800);
+                    } else {
+                        setLoadingSteps(prev => prev.map(s => s.status === 'loading' ? { ...s, status: 'error' } : s));
+                        setStatus("Error: " + (event.data.error || "Failed to fetch results"));
+                        setTimeout(() => setLoading(false), 800);
                     }
-                    setTimeout(() => setLoading(false), 800);
-                } else {
-                    setLoadingSteps(prev => prev.map(s => s.status === 'loading' ? { ...s, status: 'error' } : s));
-                    setStatus("Error: " + (event.data.error || "Failed to fetch results"));
-                    setTimeout(() => setLoading(false), 800);
+                    window.removeEventListener('message', handleMessage);
+                    window.removeEventListener('message', handleProgress);
+                }
+            };
+
+            window.addEventListener('message', handleMessage);
+            window.addEventListener('message', handleProgress);
+
+            window.postMessage({
+                type: "OPINION_DECK_DISCOVERY_REQUEST",
+                id: requestId,
+                competitor: competitor.trim()
+            }, window.location.origin);
+        } else {
+            // BACKEND DISCOVERY PATH
+            try {
+                // 1. Initial connection
+                await new Promise(r => setTimeout(r, 800));
+                setLoadingSteps(prev => prev.map(s => s.id === 'connect' ? { ...s, status: 'complete' } : s.id === 'api_check' ? { ...s, status: 'loading' } : s));
+
+                // 2. Call Backend
+                const response = await fetch('/api/discovery/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}` // Assuming token-based auth
+                    },
+                    body: JSON.stringify({
+                        query: competitor.trim(),
+                        deepDiscovery
+                    })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || 'Discovery failed');
                 }
 
-                window.removeEventListener('message', handleMessage);
-                window.removeEventListener('message', handleProgress);
+                // Transition through steps while waiting for data (simulated for UI)
+                await new Promise(r => setTimeout(r, 1200));
+                setLoadingSteps(prev => prev.map(s => s.id === 'api_check' ? { ...s, status: 'complete' } : s.id === 'fetch' ? { ...s, status: 'loading' } : s));
+
+                await new Promise(r => setTimeout(r, 1500));
+                setLoadingSteps(prev => prev.map(s => s.id === 'fetch' ? { ...s, status: 'complete' } : s.id === 'enrich' ? { ...s, status: 'loading' } : s));
+
+                const data = await response.json();
+
+                await new Promise(r => setTimeout(r, 1000));
+                setLoadingSteps(prev => prev.map(s => s.id === 'enrich' ? { ...s, status: 'complete' } : s.id === 'rank' ? { ...s, status: 'loading' } : s));
+
+                if (data.results && data.results.length > 0) {
+                    setResults(data.results);
+                }
+                if (data.discoveryPlan) {
+                    setDiscoveryPlan(data.discoveryPlan);
+                } else if (!data.results || data.results.length === 0) {
+                    setStatus("No relevant threads found. Try a broader search.");
+                }
+
+                await new Promise(r => setTimeout(r, 800));
+                setLoadingSteps(prev => prev.map(s => s.id === 'rank' ? { ...s, status: 'complete' } : s.id === 'final' ? { ...s, status: 'complete' } : s));
+                setTimeout(() => setLoading(false), 800);
+
+            } catch (err: any) {
+                console.error("Discovery error:", err);
+                setStatus("Error: " + err.message);
+                setLoadingSteps(prev => prev.map(s => s.status === 'loading' ? { ...s, status: 'error' } : s));
+                setTimeout(() => setLoading(false), 800);
             }
-        };
-
-        window.addEventListener('message', handleMessage);
-        window.addEventListener('message', handleProgress);
-
-        window.postMessage({
-            type: "OPINION_DECK_DISCOVERY_REQUEST",
-            id: requestId,
-            competitor: competitor.trim()
-        }, window.location.origin);
-
-    }, [competitor, extensionConnected]);
+        }
+    }, [competitor, deepDiscovery, extensionConnected]);
 
     const toggleSelection = (id: string) => {
         const newSelected = new Set(selectedIds);
@@ -197,116 +275,23 @@ export const ResearchView: React.FC = () => {
 
         setLoadingSteps([
             { id: 'prep', label: `Preparing ${threadsToSave.length} threads for sync`, status: 'loading' as const },
-            { id: 'fetch', label: 'Deep-fetching reddit intelligence', status: 'pending' as const },
-            { id: 'extract', label: 'Extracting key signals & comments', status: 'pending' as const },
-            { id: 'cloud', label: `Uploading to ${folderName}`, status: 'pending' as const },
-            { id: 'sync', label: 'Synchronizing research bucket', status: 'pending' as const }
+            { id: 'queue', label: `Enqueuing in ${folderName} bucket`, status: 'pending' as const },
+            { id: 'done', label: 'Background sync initiated', status: 'pending' as const }
         ]);
 
         try {
             // Prep phase
+            await new Promise(r => setTimeout(r, 600));
+            setLoadingSteps(prev => prev.map(s => s.id === 'prep' ? { ...s, status: 'complete' } : s.id === 'queue' ? { ...s, status: 'loading' } : s));
+
+            const urls = threadsToSave.map(t => t.url);
+            await syncThreads(targetFolderId, urls);
+
             await new Promise(r => setTimeout(r, 800));
-            setLoadingSteps(prev => prev.map(s => s.id === 'prep' ? { ...s, status: 'complete' } : s.id === 'fetch' ? { ...s, status: 'loading' } : s));
+            setLoadingSteps(prev => prev.map(s => s.id === 'queue' ? { ...s, status: 'complete' } : s.id === 'done' ? { ...s, status: 'complete' } : s));
 
-            for (let i = 0; i < threadsToSave.length; i++) {
-                const thread = threadsToSave[i];
-                const currentLabel = `Fetching: ${thread.title.substring(0, 30)}...`;
-                setLoadingSteps(prev => prev.map(s => s.id === 'fetch' ? { ...s, label: currentLabel } : s));
-
-                // 1. Fetch JSON via extension bridge
-                const requestId = Math.random().toString(36).substring(7);
-                window.postMessage({
-                    type: "OPINION_DECK_FETCH_REQUEST",
-                    id: requestId,
-                    url: thread.url
-                }, window.location.origin);
-
-                const fetchResponse: any = await new Promise((resolve, reject) => {
-                    const listener = (event: MessageEvent) => {
-                        if (event.data.type === "OPINION_DECK_FETCH_RESPONSE" && event.data.id === requestId) {
-                            window.removeEventListener('message', listener);
-                            if (event.data.success) resolve(event.data.data);
-                            else reject(new Error(event.data.error));
-                        }
-                    };
-                    window.addEventListener('message', listener);
-                    setTimeout(() => reject(new Error("Fetch timed out")), 20000);
-                });
-
-                // Transition to extract
-                setLoadingSteps(prev => prev.map(s =>
-                    s.id === 'fetch' ? { ...s, status: 'complete', label: 'Deep-fetched reddit intelligence' } :
-                        s.id === 'extract' ? { ...s, status: 'loading', label: `Cleaning data for: ${thread.title.substring(0, 20)}...` } : s
-                ));
-
-                // 2. Wrap into payload
-                const postData = fetchResponse[0]?.data?.children[0]?.data || {};
-                const commentListing = fetchResponse[1]?.data?.children || [];
-
-                const payload = {
-                    id: `reddit_${thread.id}`,
-                    source: 'reddit',
-                    url: thread.url,
-                    title: thread.title,
-                    folderId: targetFolderId,
-                    extractedAt: new Date().toISOString(),
-                    content: {
-                        post: postData,
-                        comments: commentListing.filter((c: any) => c.kind === 't1').map((c: any) => ({
-                            id: c.data.id,
-                            author: c.data.author,
-                            body: c.data.body,
-                            score: c.data.score,
-                            replies: []
-                        }))
-                    }
-                };
-
-                // Transition to cloud
-                setLoadingSteps(prev => prev.map(s =>
-                    s.id === 'extract' ? { ...s, status: 'complete', label: 'Extracted key signals & comments' } :
-                        s.id === 'cloud' ? { ...s, status: 'loading', label: `Syncing with Opinion Deck (${i + 1}/${threadsToSave.length})` } : s
-                ));
-
-                // 3. Save via bridge
-                const saveRequestId = Math.random().toString(36).substring(7);
-                window.postMessage({
-                    type: "OPINION_DECK_SAVE_REQUEST",
-                    id: saveRequestId,
-                    data: payload
-                }, window.location.origin);
-
-                await new Promise((resolve, reject) => {
-                    const listener = (event: MessageEvent) => {
-                        if (event.data.type === "OPINION_DECK_SAVE_RESPONSE" && event.data.id === saveRequestId) {
-                            window.removeEventListener('message', listener);
-                            if (event.data.success) resolve(true);
-                            else reject(new Error(event.data.error));
-                        }
-                    };
-                    window.addEventListener('message', listener);
-                    setTimeout(() => reject(new Error("Save timed out")), 20000);
-                });
-
-                // Reset for next thread if not last
-                if (i < threadsToSave.length - 1) {
-                    setLoadingSteps(prev => prev.map(s =>
-                        s.id === 'cloud' ? { ...s, status: 'loading' } :
-                            s.id === 'fetch' ? { ...s, status: 'loading' } :
-                                s.id === 'extract' ? { ...s, status: 'pending' } : s
-                    ));
-                    await new Promise(r => setTimeout(r, 600));
-                }
-            }
-
-            // Final sync phase
-            setLoadingSteps(prev => prev.map(s =>
-                s.id === 'cloud' ? { ...s, status: 'complete' } :
-                    s.id === 'sync' ? { ...s, status: 'loading' } : s
-            ));
-            await new Promise(r => setTimeout(r, 1200));
-            setLoadingSteps(prev => prev.map(s => s.id === 'sync' ? { ...s, status: 'complete' } : s));
-
+            setStatus(`Successfully queued ${threadsToSave.length} threads for background sync!`);
+            setSelectedIds(new Set());
         } catch (err: any) {
             console.error("Batch save failed:", err);
             setStatus("Error: " + err.message);
@@ -316,8 +301,6 @@ export const ResearchView: React.FC = () => {
         setTimeout(() => {
             setLoading(false);
             setProgress(null);
-            setStatus(`Successfully saved ${threadsToSave.length} threads!`);
-            setSelectedIds(new Set());
         }, 1000);
     };
 
@@ -371,6 +354,26 @@ export const ResearchView: React.FC = () => {
                             Search
                         </button>
                     </div>
+
+                    {isDebugMode && (
+                        <div className="discovery-options">
+                            <label className="toggle-container">
+                                <input
+                                    type="checkbox"
+                                    checked={deepDiscovery}
+                                    onChange={(e) => setDeepDiscovery(e.target.checked)}
+                                />
+                                <span className="toggle-slider"></span>
+                                <span className="toggle-label">Deep Discovery (Slow, but high quality)</span>
+                            </label>
+                            <div className="discovery-hint">
+                                {deepDiscovery ?
+                                    "Uses a specialized algorithm to find deep intent threads." :
+                                    "Uses Google/Serper for broad discovery."}
+                            </div>
+                        </div>
+                    )}
+
                     {status && <div className="status-message" style={{ marginTop: '20px', color: status.includes('Error') ? 'var(--error-color, #ef4444)' : 'var(--primary-color)' }}>{status}</div>}
                 </div>
             </div>
@@ -397,6 +400,34 @@ export const ResearchView: React.FC = () => {
                 </div>
             )}
 
+            {!loading && discoveryPlan && (
+                <div className="discovery-plan-banner">
+                    <div className="plan-stats">
+                        <div className="plan-stat">
+                            <span className="stat-label">Scanned</span>
+                            <span className="stat-value">{discoveryPlan.scannedCount}</span>
+                        </div>
+                        <div className="plan-stat">
+                            <span className="stat-label">High Signal</span>
+                            <span className="stat-value">{discoveryPlan.totalFound}</span>
+                        </div>
+                        <div className="plan-stat">
+                            <span className="stat-label">Cached</span>
+                            <span className="stat-value">{discoveryPlan.cachedCount}</span>
+                        </div>
+                        <div className="plan-stat">
+                            <span className="stat-label">Sync Time</span>
+                            <span className="stat-value">~{Math.round(discoveryPlan.estimatedSyncTime)}s</span>
+                        </div>
+                    </div>
+                    {discoveryPlan.isFromCache && (
+                        <div className="plan-cache-badge">
+                            <Info size={14} /> Global search cached 24h ago
+                        </div>
+                    )}
+                </div>
+            )}
+
             {!loading && results.length > 0 && (
                 <div className="results-grid">
                     {results.map(thread => (
@@ -408,7 +439,22 @@ export const ResearchView: React.FC = () => {
                             <div className="checkbox-indicator">
                                 {selectedIds.has(thread.id) && <Check size={16} />}
                             </div>
-                            <span className="thread-subreddit-tag">r/{thread.subreddit}</span>
+                            <div className="thread-card-header">
+                                <span className="thread-subreddit-tag">r/{thread.subreddit}</span>
+                                <div className="header-right-discovery">
+                                    {thread.isCached && <span className="cached-badge">CACHED</span>}
+                                    <a
+                                        href={thread.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="external-link-icon"
+                                        onClick={(e) => e.stopPropagation()}
+                                        title="Open in Reddit"
+                                    >
+                                        <ExternalLink size={14} />
+                                    </a>
+                                </div>
+                            </div>
                             <h3 className="thread-title-discovery">{thread.title}</h3>
                             <div className="thread-stats-discovery">
                                 <div className="stat-item">

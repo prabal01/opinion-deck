@@ -29,9 +29,12 @@ import {
     getThreadsInFolder,
     saveAnalysis,
     getLatestAnalysis, getFolderAnalyses,
-    getAdminStorage
+    getAdminStorage,
+    updateFolderSyncStatus,
+    incrementPendingSyncCount
 } from "./server/firestore.js";
 import { analyzeThreads } from "./server/ai.js";
+import { RedditDiscoveryService } from "./server/redditDiscovery.js";
 
 // ── Init ───────────────────────────────────────────────────────────
 
@@ -234,7 +237,7 @@ app.delete("/api/folders/:id", async (req: express.Request, res: express.Respons
 
 // ── Saved Thread Routes ───────────────────────────────────────────
 
-app.post("/api/folders/:id/threads", async (req: express.Request, res: express.Response) => {
+app.post("/api/folders/:id/threads", authMiddleware, async (req: express.Request, res: express.Response) => {
     if (!req.user) {
         res.status(401).json({ error: "Unauthorized" });
         return;
@@ -248,6 +251,45 @@ app.post("/api/folders/:id/threads", async (req: express.Request, res: express.R
         await saveThreadToFolder(req.user.uid, req.params.id as string, threadData);
         res.json({ success: true });
     } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post("/api/folders/:id/sync", authMiddleware, async (req: express.Request, res: express.Response) => {
+    if (!req.user) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
+    const { urls } = req.body;
+    const folderId = req.params.id as string;
+
+    if (!Array.isArray(urls) || urls.length === 0) {
+        res.status(400).json({ error: "Invalid URLs provided" });
+        return;
+    }
+
+    try {
+        console.log(`[SyncAPI] Initiating sync for folder ${folderId} with ${urls.length} threads.`);
+        // 1. Set folder status to syncing
+        await updateFolderSyncStatus(req.user.uid, folderId, 'syncing');
+
+        // 2. Increment pending count
+        await incrementPendingSyncCount(req.user.uid, folderId, urls.length);
+
+        // 3. Enqueue jobs with Priority based on Plan
+        const priority = req.user.plan === 'free' ? 10 : 3;
+
+        for (const url of urls) {
+            await syncQueue.add("sync", {
+                url,
+                folderId,
+                userUid: req.user.uid
+            }, { priority });
+        }
+
+        res.json({ success: true, count: urls.length });
+    } catch (err: any) {
+        console.error(`[SyncAPI] Failed to initiate sync for folder ${folderId}:`, err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -338,7 +380,50 @@ const analysisQueueEvents = new QueueEvents("analysis", {
 });
 console.log("[INIT] BullMQ Queue Events initialized.");
 
-// Worker Processor
+// ── Reddit Sync Queue (BullMQ) ───────────────────────────────────
+
+const syncQueue = new Queue("reddit-sync", {
+    connection: { url: redisUrl },
+    defaultJobOptions: {
+        removeOnComplete: { count: 50, age: 3600 },
+        removeOnFail: { count: 100, age: 24 * 3600 },
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 30000 }
+    }
+});
+console.log("[INIT] BullMQ Reddit Sync Queue initialized.");
+
+const syncWorker = new Worker("reddit-sync", async (job) => {
+    const { url, folderId, userUid } = job.data;
+    console.log(`[SyncWorker] Processing thread: ${url} for folder: ${folderId}`);
+
+    try {
+        const fullData = await RedditDiscoveryService.fetchFullThreadRecord(url, 500);
+        if (!fullData) throw new Error("Failed to fetch thread data from Reddit");
+
+        await saveThreadToFolder(userUid, folderId, fullData);
+        console.log(`[SyncWorker] Successfully synced thread: ${url}`);
+    } catch (err: any) {
+        console.error(`[SyncWorker] Failed to sync ${url}:`, err.message);
+        throw err; // Allow BullMQ to retry
+    } finally {
+        // Decrease pending count and handle status update
+        await incrementPendingSyncCount(userUid, folderId, -1);
+    }
+}, {
+    connection: { url: redisUrl },
+    concurrency: 1, // STRICT rate limiting (1 thread at a time per worker instance)
+    limiter: {
+        max: 1,
+        duration: 1000 // 1 per second
+    }
+});
+
+syncWorker.on('failed', (job, err) => {
+    console.error(`[SyncWorker] Job ${job?.id} failed:`, err);
+});
+
+// Worker Processor (Analysis)
 const analysisWorker = new Worker("analysis", async (job) => {
     console.log(">>>>>>>>>>>>>>>>>>>> WORKER PICKED UP JOB:", job.id);
     const { threadsContext, folderContext, userUid, folderId, plan, totalComments } = job.data;
@@ -764,6 +849,82 @@ app.post("/api/extractions", async (req: express.Request, res: express.Response)
 
         res.json({ success: true, id: data.id });
     } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post("/api/discovery/search", authMiddleware, async (req: express.Request, res: express.Response) => {
+    const { query, deepDiscovery } = req.body;
+    if (!query) {
+        return res.status(400).json({ error: "Query is required" });
+    }
+
+    try {
+        console.log(`[Discovery] Starting search for: ${query} (Deep: ${deepDiscovery})`);
+        let results: any[] = [];
+        let discoveryPlan: any = null;
+
+        if (deepDiscovery) {
+            const discoveryData = await RedditDiscoveryService.deepDiscovery(query);
+            results = discoveryData.results;
+
+            const cachedCount = results.filter((r: any) => r.isCached).length;
+            discoveryPlan = {
+                scannedCount: discoveryData.scannedCount || results.length,
+                totalFound: results.length,
+                cachedCount,
+                newCount: results.length - cachedCount,
+                estimatedSyncTime: (results.length - cachedCount) * 1.5,
+                isFromCache: discoveryData.isFromCache,
+                recommendedPath: results.slice(0, 5).map((r: any) => r.title)
+            };
+        } else {
+            const SERPER_API_KEY = process.env.SERPER_API_KEY;
+            if (!SERPER_API_KEY) {
+                console.error("[Discovery] SERPER_API_KEY missing in environment");
+                return res.status(500).json({ error: "Serper API key not configured" });
+            }
+
+            console.log(`[Discovery] [API_CALL] Fetching Serper results for: ${query}`);
+            const serperResponse = await fetch("https://google.serper.dev/search", {
+                method: "POST",
+                headers: {
+                    "X-API-KEY": SERPER_API_KEY,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    q: `site:reddit.com ${query}`,
+                    num: 20,
+                    gl: "us",
+                    hl: "en"
+                })
+            });
+
+            const data: any = await serperResponse.json();
+            const rawResults = (data.organic || []).map((r: any) => ({
+                id: r.link,
+                title: r.title,
+                url: r.link,
+                subreddit: r.link.includes('/r/') ? r.link.split('/r/')[1].split('/')[0] : 'r/unknown',
+                ups: 0,
+                num_comments: 0
+            }));
+
+            // Check cache status for Serper results
+            results = await RedditDiscoveryService.checkMetadataCacheStatus(rawResults);
+            const cachedCount = results.filter((r: any) => r.isCached).length;
+            discoveryPlan = {
+                scannedCount: results.length * 3, // Serper usually scans more than it shows
+                totalFound: results.length,
+                cachedCount,
+                newCount: results.length - cachedCount,
+                estimatedSyncTime: (results.length - cachedCount) * 1.5
+            };
+        }
+
+        res.json({ results, discoveryPlan });
+    } catch (err: any) {
+        console.error("[Discovery] Error:", err);
         res.status(500).json({ error: err.message });
     }
 });

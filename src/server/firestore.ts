@@ -132,6 +132,8 @@ export interface Folder {
     color?: string;
     createdAt: string;
     threadCount: number;
+    syncStatus?: 'idle' | 'syncing';
+    pendingSyncCount?: number;
 }
 
 export interface SavedThread {
@@ -371,6 +373,38 @@ export async function deleteFolder(uid: string, folderId: string): Promise<void>
         threads.docs.forEach((d: any) => batch.delete(d.ref));
         batch.delete(ref);
         await batch.commit();
+    }
+}
+
+export async function updateFolderSyncStatus(uid: string, folderId: string, status: 'idle' | 'syncing'): Promise<void> {
+    if (!db) return;
+    try {
+        await db.collection("folders").doc(folderId).update({ syncStatus: status });
+    } catch (err) {
+        console.error(`[FIRESTORE] Failed to update sync status for folder ${folderId}:`, err);
+    }
+}
+
+export async function incrementPendingSyncCount(uid: string, folderId: string, delta: number): Promise<void> {
+    if (!db) return;
+    try {
+        const { FieldValue } = await import("firebase-admin/firestore");
+        await db.collection("folders").doc(folderId).update({
+            pendingSyncCount: FieldValue.increment(delta)
+        });
+
+        // Auto-idle if count hits zero or less
+        if (delta < 0) {
+            const doc = await db.collection("folders").doc(folderId).get();
+            if (doc.exists && (doc.data()?.pendingSyncCount || 0) <= 0) {
+                await db.collection("folders").doc(folderId).update({
+                    syncStatus: 'idle',
+                    pendingSyncCount: 0
+                });
+            }
+        }
+    } catch (err) {
+        console.error(`[FIRESTORE] Failed to increment pending sync count for folder ${folderId}:`, err);
     }
 }
 
