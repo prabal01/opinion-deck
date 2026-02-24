@@ -31,9 +31,11 @@ import {
     getLatestAnalysis, getFolderAnalyses,
     getAdminStorage,
     updateFolderSyncStatus,
-    incrementPendingSyncCount
+    incrementPendingSyncCount,
+    updateFolderAnalysisStatus,
+    updateThreadInsight
 } from "./server/firestore.js";
-import { analyzeThreads } from "./server/ai.js";
+import { analyzeThreads, analyzeThreadGranular } from "./server/ai.js";
 import { RedditDiscoveryService } from "./server/redditDiscovery.js";
 
 // ── Init ───────────────────────────────────────────────────────────
@@ -391,6 +393,16 @@ const syncQueue = new Queue("reddit-sync", {
         backoff: { type: 'exponential', delay: 30000 }
     }
 });
+
+const granularAnalysisQueue = new Queue("granular-analysis", {
+    connection: { url: redisUrl },
+    defaultJobOptions: {
+        removeOnComplete: { count: 100, age: 3600 },
+        removeOnFail: { count: 100, age: 24 * 3600 },
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 10000 }
+    }
+});
 console.log("[INIT] BullMQ Reddit Sync Queue initialized.");
 
 const syncWorker = new Worker("reddit-sync", async (job) => {
@@ -401,8 +413,26 @@ const syncWorker = new Worker("reddit-sync", async (job) => {
         const fullData = await RedditDiscoveryService.fetchFullThreadRecord(url, 500);
         if (!fullData) throw new Error("Failed to fetch thread data from Reddit");
 
-        await saveThreadToFolder(userUid, folderId, fullData);
+        const savedThread = await saveThreadToFolder(userUid, folderId, fullData);
         console.log(`[SyncWorker] Successfully synced thread: ${url}`);
+
+        // 4. Auto-trigger Granular Analysis
+        // Ensure folder status is processing so UI shows metrics bar
+        await updateFolderAnalysisStatus(userUid, folderId, 'processing');
+
+        const finalThreadId = fullData.id || fullData.post?.id;
+        if (finalThreadId) {
+            await granularAnalysisQueue.add("granular-analyze", {
+                threadId: finalThreadId,
+                url: url,
+                folderId,
+                userUid,
+                title: fullData.title || fullData.post?.title,
+                subreddit: fullData.subreddit || fullData.post?.subreddit
+            });
+        } else {
+            console.warn(`[SyncWorker] Could not trigger analysis: No thread ID found for ${url}`);
+        }
     } catch (err: any) {
         console.error(`[SyncWorker] Failed to sync ${url}:`, err.message);
         throw err; // Allow BullMQ to retry
@@ -421,6 +451,63 @@ const syncWorker = new Worker("reddit-sync", async (job) => {
 
 syncWorker.on('failed', (job, err) => {
     console.error(`[SyncWorker] Job ${job?.id} failed:`, err);
+});
+
+const granularAnalysisWorker = new Worker("granular-analysis", async (job) => {
+    const { threadId, url, folderId, userUid, title, subreddit } = job.data;
+    console.log(`[GranularWorker] Analyzing thread: ${threadId} for folder: ${folderId}`);
+
+    try {
+        // 1. Fetch thread from Firestore (SavedThread)
+        const threads = await getThreadsInFolder(userUid, folderId);
+        const thread = threads.find(t => t.id === threadId);
+
+        if (!thread) throw new Error(`Thread ${threadId} not found in folder ${folderId}`);
+
+        // 2. Resolve content (Storage or local)
+        let comments = (thread.data as any)?.comments || [];
+        if (thread.storageUrl && comments.length === 0) {
+            const url = new URL(thread.storageUrl);
+            const pathWithV0 = url.pathname.split('/o/')[1].split('?')[0];
+            const filePath = decodeURIComponent(pathWithV0);
+            const [fileContents] = await getAdminStorage().bucket().file(filePath).download();
+            const contentJson = JSON.parse(fileContents.toString());
+            comments = contentJson.flattenedComments || contentJson.comments || contentJson.reviews || [];
+        }
+
+        // 3. Call AI
+        const insights = await analyzeThreadGranular({
+            id: threadId,
+            title: thread.title,
+            subreddit: thread.subreddit,
+            comments: comments
+        });
+
+        // 4. Save to Firestore (Helper handles metric increments & thread deletion)
+        await updateThreadInsight(userUid, folderId, {
+            id: threadId,
+            folderId,
+            uid: userUid,
+            threadLink: url || thread.source,
+            status: 'success',
+            insights
+        });
+
+    } catch (err: any) {
+        console.error(`[GranularWorker] Failed for ${threadId}:`, err.message);
+        await updateThreadInsight(userUid, folderId, {
+            id: threadId,
+            folderId,
+            uid: userUid,
+            threadLink: url,
+            status: 'failed',
+            error: err.message
+        });
+        throw err;
+    }
+}, {
+    connection: { url: redisUrl },
+    concurrency: 4 // Parallel processing
 });
 
 // Worker Processor (Analysis)
@@ -520,78 +607,38 @@ app.post("/api/folders/:id/analyze", async (req: express.Request, res: express.R
     }
 
     try {
-        // 1. Fetch folder details for context
-        const folder = await getFolder(req.user.uid, req.params.id as string);
-        const folderContext = folder?.description || "";
+        const folderId = req.params.id as string;
+        const folder = await getFolder(req.user.uid, folderId);
 
-        // 2. Fetch all threads in folder
-        const savedThreads = await getThreadsInFolder(req.user.uid, req.params.id as string);
+        if (!folder) {
+            res.status(404).json({ error: "Folder not found" });
+            return;
+        }
 
+        const savedThreads = await getThreadsInFolder(req.user.uid, folderId);
         if (savedThreads.length === 0) {
             res.status(400).json({ error: "Folder is empty" });
             return;
         }
 
-        // Calculate total comments
-        const totalComments = savedThreads.reduce((sum, thread) => {
-            // Safe access for cloud-saved threads where data is null
-            const count = (thread as any).commentCount || (thread.data?.comments ? countComments(thread.data.comments) : 0);
-            return sum + count;
-        }, 0);
+        console.log(`[API] Triggering granular analysis for folder ${folderId} (${savedThreads.length} threads)`);
 
-        // Map to simplified context for AI
-        const threadsContext = savedThreads.map(t => ({
-            id: t.id,
-            title: t.title,
-            subreddit: t.subreddit,
-            // REVERT: Sending full comments to Redis again to ensure AI has context
-            // We'll rely on BullMQ job retention for Redis cleanup instead of payload reduction for now
-            comments: (t.data as any)?.comments || null,
-            storageUrl: (t as any).storageUrl || null
-        }));
+        // 1. Initial State
+        await updateFolderAnalysisStatus(req.user.uid, folderId, 'processing');
 
-        // 3. Add to Analysis Queue (BullMQ)
-        // We await the job addition, but the processing is async
-        const job = await analysisQueue.add("analyze-folder", {
-            threadsContext,
-            folderContext,
-            userUid: req.user.uid,
-            folderId: req.params.id,
-            plan: req.user.plan,
-            totalComments,
-            threadCount: savedThreads.length
-        });
-
-        console.log(`[API] Enqueued analysis job ${job.id} for user ${req.user.uid}`);
-
-        // For MVP: We want to wait for the job to finish to return the response to the frontend
-        // In a real async architecture, we would return 202 Accepted and have the frontend poll
-        // But to keep frontend changes minimal (or zero), we can wait for the job here
-        // Note: serverless functions might time out, but we are on Render/Cloud Run so we have some time.
-
-        try {
-            const finishedResult = await job.waitUntilFinished(analysisQueueEvents);
-
-            let responsePayload = finishedResult;
-
-            // Redact for Free Users immediately
-            if (req.user.plan === 'free') {
-                responsePayload = redactAnalysis(finishedResult);
-            }
-
-            console.log(`[API] Sending analysis response. Keys present:`, Object.keys(responsePayload));
-            if (responsePayload.market_attack_summary) {
-                console.log(`[API] market_attack_summary confirmed in payload.`);
-            } else {
-                console.warn(`[API] WARNING: market_attack_summary MISSING in final payload!`);
-            }
-
-            res.json(responsePayload);
-
-        } catch (jobErr) {
-            console.error("Job Failed:", jobErr);
-            res.status(500).json({ error: "Analysis failed during processing" });
+        // 2. Enqueue each thread
+        for (const thread of savedThreads) {
+            await granularAnalysisQueue.add("granular-analyze", {
+                threadId: thread.id,
+                url: thread.source,
+                folderId,
+                userUid: req.user.uid,
+                title: thread.title,
+                subreddit: thread.subreddit
+            });
         }
+
+        res.json({ success: true, count: savedThreads.length });
 
     } catch (err: any) {
         console.error("Analysis Error:", err);

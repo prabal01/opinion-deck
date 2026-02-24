@@ -134,6 +134,11 @@ export interface Folder {
     threadCount: number;
     syncStatus?: 'idle' | 'syncing';
     pendingSyncCount?: number;
+    analysisStatus?: 'idle' | 'processing' | 'complete' | 'failed';
+    painPointCount?: number;
+    triggerCount?: number;
+    outcomeCount?: number;
+    failedCount?: number;
 }
 
 export interface SavedThread {
@@ -149,6 +154,25 @@ export interface SavedThread {
     storageUrl?: string; // Pointer to external storage
     tokenCount?: number;
     savedAt: string;
+    analysisStatus?: 'pending' | 'processing' | 'success' | 'failed';
+}
+
+export interface StructuredThreadInsights {
+    thread_id: string;
+    pain_points: { title: string; quotes: string[] }[];
+    switch_triggers: { title: string; quotes: string[] }[];
+    desired_outcomes: { title: string; quotes: string[] }[];
+}
+
+export interface ThreadInsight {
+    id: string; // threadId
+    folderId: string;
+    uid: string;
+    threadLink: string;
+    status: 'processing' | 'success' | 'failed';
+    insights?: StructuredThreadInsights;
+    error?: string;
+    analyzedAt?: string;
 }
 
 // ── Default configs (used if Firestore not available) ──────────────
@@ -405,6 +429,63 @@ export async function incrementPendingSyncCount(uid: string, folderId: string, d
         }
     } catch (err) {
         console.error(`[FIRESTORE] Failed to increment pending sync count for folder ${folderId}:`, err);
+    }
+}
+
+export async function updateFolderAnalysisStatus(uid: string, folderId: string, status: Folder['analysisStatus']): Promise<void> {
+    if (!db) return;
+    try {
+        const update: any = { analysisStatus: status };
+        if (status === 'processing') {
+            update.painPointCount = 0;
+            update.triggerCount = 0;
+            update.outcomeCount = 0;
+            update.failedCount = 0;
+        }
+        await db.collection("folders").doc(folderId).update(update);
+    } catch (err) {
+        console.error(`[FIRESTORE] Failed to update analysis status for folder ${folderId}:`, err);
+    }
+}
+
+export async function updateThreadInsight(uid: string, folderId: string, insight: ThreadInsight): Promise<void> {
+    if (!db || !insight.id) {
+        console.warn(`[FIRESTORE] updateThreadInsight skipped: Missing DB or Insight ID`);
+        return;
+    }
+    try {
+        const { FieldValue } = await import("firebase-admin/firestore");
+        const folderRef = db.collection("folders").doc(folderId);
+        const insightRef = db.collection("folders").doc(folderId).collection("thread_insights").doc(insight.id);
+        const threadRef = db.collection("saved_threads").doc(`${folderId}_${insight.id}`);
+
+        // 1. Update Insight doc
+        await insightRef.set({ ...insight, analyzedAt: new Date().toISOString() }, { merge: true });
+
+        // 2. Update parent thread status (if it still exists)
+        await threadRef.update({ analysisStatus: insight.status }).catch(() => { });
+
+        // 3. If success, increment metrics and delete raw thread
+        if (insight.status === 'success' && insight.insights) {
+            const pCount = insight.insights.pain_points.length;
+            const tCount = insight.insights.switch_triggers.length;
+            const oCount = insight.insights.desired_outcomes.length;
+
+            await folderRef.update({
+                painPointCount: FieldValue.increment(pCount),
+                triggerCount: FieldValue.increment(tCount),
+                outcomeCount: FieldValue.increment(oCount)
+            });
+
+            // Delete original thread doc once we have structure
+            await threadRef.delete().catch(() => { });
+        } else if (insight.status === 'failed') {
+            await folderRef.update({
+                failedCount: FieldValue.increment(1)
+            });
+        }
+    } catch (err) {
+        console.error(`[FIRESTORE] Failed to update thread insight ${insight.id}:`, err);
     }
 }
 

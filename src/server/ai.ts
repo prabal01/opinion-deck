@@ -1,27 +1,68 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { VertexAI } from "@google-cloud/vertexai";
 
-const apiKey = process.env.GEMINI_API_KEY || "";
-if (!apiKey) {
-    console.error("[AI] ERROR: GEMINI_API_KEY is not set in environment variables!");
-}
-console.log(`[AI] Initializing Google Generative AI (AI Studio SDK)... Key present: ${!!apiKey}`);
+const project = process.env.GOOGLE_CLOUD_PROJECT || "redditkeeperprod";
+const location = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
 
-const genAI = new GoogleGenerativeAI(apiKey);
+console.log(`[AI] Initializing Vertex AI... Project: ${project}, Location: ${location}`);
 
-const responseSchema = {
-    type: SchemaType.OBJECT,
+const vertexAI = new VertexAI({ project, location });
+
+// Schema Definitions using Vertex AI format ('object', 'string', etc.)
+const granularThreadInsightSchema: any = {
+    type: 'object',
+    properties: {
+        thread_id: { type: 'string' },
+        pain_points: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    title: { type: 'string' },
+                    quotes: { type: 'array', items: { type: 'string' } }
+                },
+                required: ["title", "quotes"]
+            }
+        },
+        switch_triggers: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    title: { type: 'string' },
+                    quotes: { type: 'array', items: { type: 'string' } }
+                },
+                required: ["title", "quotes"]
+            }
+        },
+        desired_outcomes: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    title: { type: 'string' },
+                    quotes: { type: 'array', items: { type: 'string' } }
+                },
+                required: ["title", "quotes"]
+            }
+        }
+    },
+    required: ["thread_id", "pain_points", "switch_triggers", "desired_outcomes"]
+};
+
+const responseSchema: any = {
+    type: 'object',
     properties: {
         market_attack_summary: {
-            type: SchemaType.OBJECT,
+            type: 'object',
             properties: {
-                core_frustration: { type: SchemaType.STRING },
-                primary_competitor_failure: { type: SchemaType.STRING },
-                immediate_opportunity: { type: SchemaType.STRING },
+                core_frustration: { type: 'string' },
+                primary_competitor_failure: { type: 'string' },
+                immediate_opportunity: { type: 'string' },
                 confidence_basis: {
-                    type: SchemaType.OBJECT,
+                    type: 'object',
                     properties: {
-                        threads_analyzed: { type: SchemaType.INTEGER },
-                        total_complaint_mentions: { type: SchemaType.INTEGER }
+                        threads_analyzed: { type: 'integer' },
+                        total_complaint_mentions: { type: 'integer' }
                     },
                     required: ["threads_analyzed", "total_complaint_mentions"]
                 }
@@ -29,116 +70,116 @@ const responseSchema = {
             required: ["core_frustration", "primary_competitor_failure", "immediate_opportunity", "confidence_basis"]
         },
         high_intensity_pain_points: {
-            type: SchemaType.ARRAY,
+            type: 'array',
             items: {
-                type: SchemaType.OBJECT,
+                type: 'object',
                 properties: {
-                    title: { type: SchemaType.STRING },
-                    mention_count: { type: SchemaType.INTEGER },
-                    threads_covered: { type: SchemaType.INTEGER },
-                    intensity: { type: SchemaType.STRING, enum: ["Low", "Medium", "High"] },
-                    representative_quotes: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-                    why_it_matters: { type: SchemaType.STRING }
+                    title: { type: 'string' },
+                    mention_count: { type: 'integer' },
+                    threads_covered: { type: 'integer' },
+                    intensity: { type: 'string', enum: ["Low", "Medium", "High"] },
+                    representative_quotes: { type: 'array', items: { type: 'string' } },
+                    why_it_matters: { type: 'string' }
                 },
                 required: ["title", "mention_count", "threads_covered", "intensity", "representative_quotes", "why_it_matters"]
             }
         },
         switch_triggers: {
-            type: SchemaType.ARRAY,
+            type: 'array',
             items: {
-                type: SchemaType.OBJECT,
+                type: 'object',
                 properties: {
-                    trigger: { type: SchemaType.STRING },
-                    evidence_mentions: { type: SchemaType.INTEGER },
-                    representative_quotes: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-                    strategic_implication: { type: SchemaType.STRING }
+                    trigger: { type: 'string' },
+                    evidence_mentions: { type: 'integer' },
+                    representative_quotes: { type: 'array', items: { type: 'string' } },
+                    strategic_implication: { type: 'string' }
                 },
                 required: ["trigger", "evidence_mentions", "representative_quotes", "strategic_implication"]
             }
         },
         feature_gaps: {
-            type: SchemaType.ARRAY,
+            type: 'array',
             items: {
-                type: SchemaType.OBJECT,
+                type: 'object',
                 properties: {
-                    missing_or_weak_feature: { type: SchemaType.STRING },
-                    demand_signal_strength: { type: SchemaType.STRING, enum: ["Low", "Medium", "High"] },
-                    mention_count: { type: SchemaType.INTEGER },
-                    context_summary: { type: SchemaType.STRING },
-                    opportunity_level: { type: SchemaType.STRING, enum: ["Low", "Medium", "High"] }
+                    missing_or_weak_feature: { type: 'string' },
+                    demand_signal_strength: { type: 'string', enum: ["Low", "Medium", "High"] },
+                    mention_count: { type: 'integer' },
+                    context_summary: { type: 'string' },
+                    opportunity_level: { type: 'string', enum: ["Low", "Medium", "High"] }
                 },
                 required: ["missing_or_weak_feature", "demand_signal_strength", "mention_count", "context_summary", "opportunity_level"]
             }
         },
         competitive_weakness_map: {
-            type: SchemaType.ARRAY,
+            type: 'array',
             items: {
-                type: SchemaType.OBJECT,
+                type: 'object',
                 properties: {
-                    competitor: { type: SchemaType.STRING },
-                    perceived_strength: { type: SchemaType.STRING },
-                    perceived_weakness: { type: SchemaType.STRING },
-                    exploit_opportunity: { type: SchemaType.STRING }
+                    competitor: { type: 'string' },
+                    perceived_strength: { type: 'string' },
+                    perceived_weakness: { type: 'string' },
+                    exploit_opportunity: { type: 'string' }
                 },
                 required: ["competitor", "perceived_strength", "perceived_weakness", "exploit_opportunity"]
             }
         },
         ranked_build_priorities: {
-            type: SchemaType.ARRAY,
+            type: 'array',
             items: {
-                type: SchemaType.OBJECT,
+                type: 'object',
                 properties: {
-                    priority_rank: { type: SchemaType.INTEGER },
-                    initiative: { type: SchemaType.STRING },
-                    justification: { type: SchemaType.STRING },
-                    evidence_mentions: { type: SchemaType.INTEGER },
-                    expected_impact: { type: SchemaType.STRING, enum: ["Low", "Medium", "High"] }
+                    priority_rank: { type: 'integer' },
+                    initiative: { type: 'string' },
+                    justification: { type: 'string' },
+                    evidence_mentions: { type: 'integer' },
+                    expected_impact: { type: 'string', enum: ["Low", "Medium", "High"] }
                 },
                 required: ["priority_rank", "initiative", "justification", "evidence_mentions", "expected_impact"]
             }
         },
         messaging_and_positioning_angles: {
-            type: SchemaType.ARRAY,
+            type: 'array',
             items: {
-                type: SchemaType.OBJECT,
+                type: 'object',
                 properties: {
-                    angle: { type: SchemaType.STRING },
-                    supporting_emotional_driver: { type: SchemaType.STRING },
-                    supporting_evidence_quotes: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
+                    angle: { type: 'string' },
+                    supporting_emotional_driver: { type: 'string' },
+                    supporting_evidence_quotes: { type: 'array', items: { type: 'string' } }
                 },
                 required: ["angle", "supporting_emotional_driver", "supporting_evidence_quotes"]
             }
         },
         risk_flags: {
-            type: SchemaType.ARRAY,
+            type: 'array',
             items: {
-                type: SchemaType.OBJECT,
+                type: 'object',
                 properties: {
-                    risk: { type: SchemaType.STRING },
-                    evidence_basis: { type: SchemaType.STRING }
+                    risk: { type: 'string' },
+                    evidence_basis: { type: 'string' }
                 },
                 required: ["risk", "evidence_basis"]
             }
         },
         analysis_metadata: {
-            type: SchemaType.OBJECT,
+            type: 'object',
             properties: {
-                platform: { type: SchemaType.STRING },
-                competitor_analyzed: { type: SchemaType.STRING },
-                total_threads: { type: SchemaType.INTEGER },
-                total_comments_analyzed: { type: SchemaType.INTEGER },
-                analysis_depth: { type: SchemaType.STRING, enum: ["Lean", "Moderate", "Deep"] }
+                platform: { type: 'string' },
+                competitor_analyzed: { type: 'string' },
+                total_threads: { type: 'integer' },
+                total_comments_analyzed: { type: 'integer' },
+                analysis_depth: { type: 'string', enum: ["Lean", "Moderate", "Deep"] }
             },
             required: ["platform", "competitor_analyzed", "total_threads", "total_comments_analyzed", "analysis_depth"]
         },
         launch_velocity_90_days: {
-            type: SchemaType.OBJECT,
+            type: 'object',
             properties: {
-                core_feature_to_ship: { type: SchemaType.STRING },
-                positioning_angle: { type: SchemaType.STRING },
-                target_segment: { type: SchemaType.STRING },
-                pricing_strategy: { type: SchemaType.STRING },
-                primary_differentiator: { type: SchemaType.STRING }
+                core_feature_to_ship: { type: 'string' },
+                positioning_angle: { type: 'string' },
+                target_segment: { type: 'string' },
+                pricing_strategy: { type: 'string' },
+                primary_differentiator: { type: 'string' }
             },
             required: ["core_feature_to_ship", "positioning_angle", "target_segment", "pricing_strategy", "primary_differentiator"]
         }
@@ -151,11 +192,19 @@ const responseSchema = {
     ]
 };
 
-const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+const model = vertexAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
     generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: responseSchema as any
+        responseSchema: responseSchema
+    }
+});
+
+const granularModel = vertexAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: granularThreadInsightSchema
     }
 });
 
@@ -239,23 +288,20 @@ ${threadData.map(t => `--- THREAD START ---\nTitle: ${t.title}\nSubreddit: r/${t
 `;
 
     try {
-        console.log(`[AI] Calling Gemini AI Studio SDK with ${threads.length} threads...`);
+        console.log(`[AI] Calling Vertex AI with ${threads.length} threads...`);
         const result = await model.generateContent(systemPrompt);
         const response = result.response;
-        const text = response.text();
 
-        if (!text) throw new Error("No response from AI");
+        // Vertex AI SDK response format
+        const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!text) throw new Error("No response from Vertex AI");
 
         console.log("[AI] Raw Response received. Parsing JSON...");
         const parsed = JSON.parse(text);
-        console.log("[AI] DEBUG - Response Keys:", Object.keys(parsed));
 
-        // Defensive check to avoid 500 error
+        // Defensive check
         if (!parsed.market_attack_summary) {
-            console.warn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            console.warn("[AI] CRITICAL WARNING: market_attack_summary MISSING!");
-            console.warn("[AI] Available Keys:", Object.keys(parsed));
-            console.warn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             parsed.market_attack_summary = {
                 core_frustration: "Data unavailable",
                 primary_competitor_failure: "Data unavailable",
@@ -264,7 +310,7 @@ ${threadData.map(t => `--- THREAD START ---\nTitle: ${t.title}\nSubreddit: r/${t
             };
         }
 
-        // Backward compatibility mapping for executive_summary
+        // Backward compatibility mapping
         parsed.executive_summary = parsed.market_attack_summary.core_frustration + "\n\n" + parsed.market_attack_summary.immediate_opportunity;
 
         return {
@@ -272,7 +318,64 @@ ${threadData.map(t => `--- THREAD START ---\nTitle: ${t.title}\nSubreddit: r/${t
             usage: response.usageMetadata
         };
     } catch (error) {
-        console.error("AI Analysis Error:", error);
+        console.error("Vertex AI Analysis Error:", error);
+        throw error;
+    }
+}
+
+export async function analyzeThreadGranular(thread: ThreadContext) {
+    const threadContent = minifyComments(thread.comments);
+
+    const systemPrompt = `
+You are a competitive intelligence analyst.
+Your job is to transform a SINGLE raw customer discussion thread into highly granular, structured intent signals.
+
+Return a JSON object that EXACTLY follows this structure:
+{
+  "thread_id": "${thread.id}",
+  "pain_points": [
+    {
+      "title": "string (lowercase, concrete, no adjectives, problem-focused, max 6 words)",
+      "quotes": ["string (verbatim)"]
+    }
+  ],
+  "switch_triggers": [
+    {
+      "title": "string (lowercase, concrete, situational, max 6 words)",
+      "quotes": ["string (verbatim)"]
+    }
+  ],
+  "desired_outcomes": [
+    {
+      "title": "string (lowercase, result-oriented, max 6 words)",
+      "quotes": ["string (verbatim)"]
+    }
+  ]
+}
+
+STRICT CONSTRAINTS:
+1. TITLES: Must be lowercase, concrete, max 6 words. No adjectives. No ranking.
+2. QUOTES: Must be 100% verbatim from the text.
+3. NO SPECULATION: If a signal is not explicitly present, return an empty array for that category.
+4. CONCRETE: Focused on the specific problem described.
+
+INPUT:
+Thread Title: ${thread.title}
+Subreddit: r/${thread.subreddit}
+
+Thread Data:
+${threadContent}
+`;
+
+    try {
+        console.log(`[AI] [GRANULAR] Analyzing thread ${thread.id} via Vertex AI...`);
+        const result = await granularModel.generateContent(systemPrompt);
+        const text = result.response.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!text) throw new Error("No response from Vertex AI");
+        return JSON.parse(text);
+    } catch (error) {
+        console.error(`[AI] [GRANULAR] Error analyzing thread ${thread.id}:`, error);
         throw error;
     }
 }
