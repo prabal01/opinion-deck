@@ -84,7 +84,6 @@ window.addEventListener("message", (event) => {
                 id: event.data.id,
                 success: response && response.status === 'success',
                 error: (response && response.status === 'success') ? null : (response ? response.error : "Unknown error"),
-                results: [], // Crucial: Always provide array to satisfy Web App's discovery mode
                 sidepanel: true
             }, window.location.origin);
         });

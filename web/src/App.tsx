@@ -139,14 +139,16 @@ function AppContent() {
 
               <Route path="/" element={
                 <RequireAuth>
-                  <HomeView />
+                  <ResearchView />
                 </RequireAuth>
               } />
-              <Route path="/folders" element={
+              <Route path="/decks" element={
                 <RequireAuth>
                   <HomeView />
                 </RequireAuth>
               } />
+              <Route path="/folders" element={<Navigate to="/decks" replace />} />
+              <Route path="/research" element={<Navigate to="/" replace />} />
               <Route path="/reports" element={
                 <RequireAuth>
                   <ReportsView />
@@ -157,11 +159,7 @@ function AppContent() {
                   <SettingsView />
                 </RequireAuth>
               } />
-              <Route path="/research" element={
-                <RequireAuth>
-                  <ResearchView />
-                </RequireAuth>
-              } />
+              {/* Research alias handled by Navigate above */}
               <Route path="/folders/:folderId" element={
                 <RequireAuth>
                   <FolderDetail />

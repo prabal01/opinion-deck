@@ -4,9 +4,10 @@ import express from "express";
 import cors from "cors";
 // Queue definitions removed (replaced by BullMQ)
 import { countComments } from "./reddit/tree-builder.js";
-import type {
+import {
     Comment,
 } from "./reddit/types.js";
+import { minifyComments } from "./server/ai.js";
 import {
     initFirebase,
     getFirebaseStatus,
@@ -690,6 +691,11 @@ app.post("/api/extractions", async (req: express.Request, res: express.Response)
                         ? countComments(data.content.comments)
                         : items.length;
 
+                    // Calculate estimated token count
+                    const minifiedChars = minifyComments(items).length;
+                    const titleChars = data.title?.length || 0;
+                    const tokenCount = Math.ceil((minifiedChars + titleChars) / 4);
+
                     // Update the content object with truncated array
                     const updatedContent = { ...data.content };
                     updatedContent[arrayKey] = items;
@@ -702,6 +708,7 @@ app.post("/api/extractions", async (req: express.Request, res: express.Response)
                         post: data.content.post || { title: data.title },
                         content: updatedContent,
                         commentCount: truncated ? items.length : totalCount,
+                        tokenCount,
                         source: data.source,
                         metadata: {
                             fetchedAt: data.extractedAt || new Date().toISOString(),
@@ -729,6 +736,7 @@ app.post("/api/extractions", async (req: express.Request, res: express.Response)
                         },
                         content: null,
                         commentCount: data.commentCount || 0,
+                        tokenCount: data.tokenCount || 0,
                         source: source,
                         storageUrl: data.storageUrl,
                         metadata: {

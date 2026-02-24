@@ -27,6 +27,7 @@ export const ResearchView: React.FC = () => {
     const [loadingSteps, setLoadingSteps] = useState<{ id: string; label: string; status: 'pending' | 'loading' | 'complete' | 'error' }[]>([]);
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
+    const [isSearchingStarted, setIsSearchingStarted] = useState(false);
 
     // Ping extension on mount
     useEffect(() => {
@@ -82,6 +83,7 @@ export const ResearchView: React.FC = () => {
     const handleSearch = useCallback(async () => {
         if (!competitor.trim()) return;
 
+        setIsSearchingStarted(true);
         setLoading(true);
         setResults([]);
         setSelectedIds(new Set());
@@ -138,16 +140,25 @@ export const ResearchView: React.FC = () => {
         const handleMessage = (event: MessageEvent) => {
             if (event.data.type === "OPINION_DECK_DISCOVERY_RESPONSE" && event.data.id === requestId) {
                 if (event.data.success) {
+                    // If sidepanel is taking over, don't stop loading or remove listeners yet
+                    if (event.data.sidepanel) {
+                        setLoadingSteps(prev => prev.map(s => s.id === 'ext' ? { ...s, status: 'complete' } : s.id === 'query' ? { ...s, status: 'loading' } : s));
+                        // We keep handleProgress active to receive updates from the extension
+                        return;
+                    }
+
                     setLoadingSteps(prev => prev.map(s => ({ ...s, status: 'complete' })));
                     setResults(event.data.results || []);
                     if (event.data.results.length === 0) {
                         setStatus("No relevant threads found. Try a different competitor name.");
                     }
+                    setTimeout(() => setLoading(false), 800);
                 } else {
                     setLoadingSteps(prev => prev.map(s => s.status === 'loading' ? { ...s, status: 'error' } : s));
                     setStatus("Error: " + (event.data.error || "Failed to fetch results"));
+                    setTimeout(() => setLoading(false), 800);
                 }
-                setTimeout(() => setLoading(false), 800);
+
                 window.removeEventListener('message', handleMessage);
                 window.removeEventListener('message', handleProgress);
             }
@@ -311,7 +322,7 @@ export const ResearchView: React.FC = () => {
     };
 
     return (
-        <div className="research-view">
+        <div className={`research-view ${isSearchingStarted || results.length > 0 ? 'searching-started' : ''}`}>
             <header className="research-header">
                 <h1>Competitor Discovery</h1>
                 <p>Find the most engaged Reddit discussions about your competitors.</p>
@@ -344,21 +355,24 @@ export const ResearchView: React.FC = () => {
                 </div>
             )}
 
-            <div className="search-container">
-                <div className="search-box-large">
-                    <input
-                        type="text"
-                        placeholder="e.g. Notion, Linear, Slack..."
-                        value={competitor}
-                        onChange={(e) => setCompetitor(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    />
-                    <button className="search-button-large" onClick={handleSearch} disabled={loading || !competitor.trim()}>
-                        {loading && !progress ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
-                        Search
-                    </button>
+            <div className="discovery-hero-section">
+
+                <div className="search-container">
+                    <div className="search-box-large">
+                        <input
+                            type="text"
+                            placeholder="e.g. Notion, Linear, Slack..."
+                            value={competitor}
+                            onChange={(e) => setCompetitor(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                        />
+                        <button className="search-button-large" onClick={handleSearch} disabled={loading || !competitor.trim()}>
+                            {loading && !progress ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
+                            Search
+                        </button>
+                    </div>
+                    {status && <div className="status-message" style={{ marginTop: '20px', color: status.includes('Error') ? 'var(--error-color, #ef4444)' : 'var(--primary-color)' }}>{status}</div>}
                 </div>
-                {status && <div className="status-message" style={{ marginTop: '20px', color: status.includes('Error') ? 'var(--error-color, #ef4444)' : 'var(--primary-color)' }}>{status}</div>}
             </div>
 
             {loading && !!loadingSteps.length && (

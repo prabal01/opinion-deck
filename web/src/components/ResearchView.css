@@ -1,27 +1,66 @@
 .research-view {
     padding: 20px 0;
+    min-height: calc(100vh - 120px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    overflow-x: hidden;
+}
+
+.discovery-hero-section {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 20vh;
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
+}
+
+.research-view.searching-started .discovery-hero-section {
+    margin-top: 20px;
 }
 
 .research-header {
+    text-align: center;
     margin-bottom: 40px;
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.research-view.searching-started .research-header {
+    margin-bottom: 16px;
+    transform: scale(0.85);
 }
 
 .research-header h1 {
-    font-size: 2.5rem;
+    font-size: 3.5rem;
     font-weight: 800;
     color: var(--text-primary);
     margin-bottom: 12px;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.04em;
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.research-view.searching-started .research-header h1 {
+    font-size: 2rem;
 }
 
 .research-header p {
     color: var(--text-secondary);
-    font-size: 1.1rem;
+    font-size: 1.2rem;
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.research-view.searching-started .research-header p {
+    font-size: 1rem;
+    opacity: 0.7;
 }
 
 .search-container {
+    width: 100%;
     max-width: 800px;
-    margin-bottom: 40px;
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .search-box-large {
@@ -76,10 +115,24 @@
 }
 
 .results-grid {
+    width: 100%;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     gap: 24px;
     margin-bottom: 40px;
+    animation: slideUpIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes slideUpIn {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .thread-card-discovery {
@@ -351,12 +404,26 @@
 
 /* Granular Loader (Magical Feel) */
 .discovery-loading-view {
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 80px 20px;
-    animation: fadeIn 0.5s ease;
+    padding: 20px;
+    animation: slideDownIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) both;
+    animation-delay: 0.3s;
+}
+
+@keyframes slideDownIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .loading-content-discovery {

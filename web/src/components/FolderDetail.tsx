@@ -9,7 +9,7 @@ import { Skeleton } from './Skeleton';
 import './Folders.css';
 import './AnalysisResults.css';
 import { fetchFolderAnalysis } from '../lib/api';
-import { AlertTriangle, Sparkles, Trash2, BarChart2, ArrowDownCircle, Calendar, MessageSquare as MessageSquareIcon, Users, ExternalLink, FileDown } from 'lucide-react';
+import { AlertTriangle, Sparkles, Trash2, BarChart2, ArrowDownCircle, Calendar, MessageSquare as MessageSquareIcon, Users, ExternalLink, FileDown, Zap } from 'lucide-react';
 import { exportReportToPDF } from '../lib/pdfExport';
 import { IntelligenceScanner } from './IntelligenceScanner';
 
@@ -23,6 +23,7 @@ interface SavedThread {
     savedAt: string;
     data: any;
     storageUrl?: string;
+    tokenCount?: number;
 }
 
 export const FolderDetail: React.FC = () => {
@@ -126,6 +127,23 @@ export const FolderDetail: React.FC = () => {
     };
 
     // Messaging logic moved to IntelligenceScanner component
+
+    const calculateTotalTokens = () => {
+        return threads.reduce((acc, thread) => {
+            if (thread.tokenCount) return acc + thread.tokenCount;
+            // Fallback for legacy threads: 1100 chars per comment
+            const estimatedChars = (thread.title.length + (thread.commentCount * 1100));
+            return acc + Math.ceil(estimatedChars / 4);
+        }, 0);
+    };
+
+    const formatNumber = (num: number) => {
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+        return num.toString();
+    };
+
+    const totalTokens = calculateTotalTokens();
 
     const handleAnalyze = async () => {
         if (!folderId || threads.length === 0) return;
@@ -303,6 +321,11 @@ export const FolderDetail: React.FC = () => {
                         <BarChart2 size={14} color="#00D1FF" />
                         <span style={{ fontWeight: '700', color: 'white' }}>{threads.reduce((acc, t) => acc + (t.commentCount || 0), 0).toLocaleString()}</span>
                         <span style={{ color: 'var(--text-muted)' }}>Raw Insights</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Zap size={14} color="#F59E0B" />
+                        <span style={{ color: 'white', fontWeight: 600 }}>{formatNumber(totalTokens)}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>Tokens</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Calendar size={14} color="#A855F7" />

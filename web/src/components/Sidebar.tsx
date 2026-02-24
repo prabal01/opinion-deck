@@ -58,13 +58,10 @@ export const Sidebar: React.FC = () => {
 
             <nav className="sidebar-nav">
                 <NavLink to="/" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
-                    <LayoutDashboard size={18} /> <span className="link-text">Dashboard</span>
-                </NavLink>
-                <NavLink to="/folders" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
-                    <Folder size={18} /> <span className="link-text">Folders</span>
-                </NavLink>
-                <NavLink to="/research" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
                     <Search size={18} /> <span className="link-text">Research</span>
+                </NavLink>
+                <NavLink to="/decks" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+                    <LayoutDashboard size={18} /> <span className="link-text">Decks & Threads</span>
                 </NavLink>
                 <NavLink to="/reports" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
                     <RefreshCw size={18} /> <span className="link-text">Analytics</span>

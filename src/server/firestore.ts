@@ -145,6 +145,7 @@ export interface SavedThread {
     source: string;
     data: any; // Full thread JSON snapshot
     storageUrl?: string; // Pointer to external storage
+    tokenCount?: number;
     savedAt: string;
 }
 
@@ -402,6 +403,7 @@ export async function saveThreadToFolder(uid: string, folderId: string, threadDa
         source: threadData.source || "reddit",
         data: threadData.storageUrl ? null : threadData,
         storageUrl: threadData.storageUrl || null,
+        tokenCount: threadData.tokenCount || 0,
         savedAt: new Date().toISOString(),
     };
 

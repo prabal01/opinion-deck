@@ -171,10 +171,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === 'OPEN_DISCOVERY_PANEL') {
-        chrome.storage.local.set({
+        const resetData = {
             'current_discovery_competitor': request.competitor,
-            'discovery_status': 'setup'
-        }, () => {
+            'discovery_status': 'setup',
+            'discovery_results': {},
+            'discovery_processed_ids': []
+        };
+        chrome.storage.local.set(resetData, () => {
             // @ts-ignore
             chrome.sidePanel.open({ windowId: sender.tab?.windowId })
                 .then(() => sendResponse({ status: 'success' }))
@@ -207,7 +210,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         const sendProgress = (stepId: string, results?: any[]) => {
             chrome.runtime.sendMessage({ type: 'OPINION_DECK_DISCOVERY_PROGRESS', stepId, results }).catch(() => { });
-            chrome.tabs.query({ url: "*://*.opiniondeck.com/*" }, (tabs) => {
+            chrome.tabs.query({ url: ["*://*.opiniondeck.com/*", "http://localhost/*", "http://127.0.0.1/*"] }, (tabs) => {
                 tabs.forEach(tab => {
                     if (tab.id) chrome.tabs.sendMessage(tab.id, { type: 'OPINION_DECK_DISCOVERY_PROGRESS', stepId, results }).catch(() => { });
                 });
