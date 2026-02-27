@@ -139,6 +139,15 @@ export interface Folder {
     triggerCount?: number;
     outcomeCount?: number;
     failedCount?: number;
+    pendingAnalysisCount?: number;
+    totalAnalysisCount?: number;
+    completedAnalysisCount?: number;
+    intelligence_signals?: {
+        allPainPointTitles: string[];
+        allSwitchTriggerTitles: string[];
+        allDesiredOutcomeTitles: string[];
+    };
+    currentAnalysisRunId?: string;
 }
 
 export interface SavedThread {
@@ -155,6 +164,7 @@ export interface SavedThread {
     tokenCount?: number;
     savedAt: string;
     analysisStatus?: 'pending' | 'processing' | 'success' | 'failed';
+    analysisTriggeredAt?: string;
 }
 
 export interface StructuredThreadInsights {
@@ -432,15 +442,12 @@ export async function incrementPendingSyncCount(uid: string, folderId: string, d
     }
 }
 
-export async function updateFolderAnalysisStatus(uid: string, folderId: string, status: Folder['analysisStatus']): Promise<void> {
+export async function updateFolderAnalysisStatus(uid: string, folderId: string, status: Folder['analysisStatus'], analysisRunId?: string): Promise<void> {
     if (!db) return;
     try {
         const update: any = { analysisStatus: status };
-        if (status === 'processing') {
-            update.painPointCount = 0;
-            update.triggerCount = 0;
-            update.outcomeCount = 0;
-            update.failedCount = 0;
+        if (analysisRunId) {
+            update.currentAnalysisRunId = analysisRunId;
         }
         await db.collection("folders").doc(folderId).update(update);
     } catch (err) {
@@ -448,44 +455,93 @@ export async function updateFolderAnalysisStatus(uid: string, folderId: string, 
     }
 }
 
+
 export async function updateThreadInsight(uid: string, folderId: string, insight: ThreadInsight): Promise<void> {
     if (!db || !insight.id) {
         console.warn(`[FIRESTORE] updateThreadInsight skipped: Missing DB or Insight ID`);
         return;
     }
     try {
+        console.log(`[FIRESTORE] Processing intelligence aggregation for thread ${insight.id} in folder ${folderId}...`);
         const { FieldValue } = await import("firebase-admin/firestore");
         const folderRef = db.collection("folders").doc(folderId);
-        const insightRef = db.collection("folders").doc(folderId).collection("thread_insights").doc(insight.id);
         const threadRef = db.collection("saved_threads").doc(`${folderId}_${insight.id}`);
 
-        // 1. Update Insight doc
-        await insightRef.set({ ...insight, analyzedAt: new Date().toISOString() }, { merge: true });
-
-        // 2. Update parent thread status (if it still exists)
-        await threadRef.update({ analysisStatus: insight.status }).catch(() => { });
-
-        // 3. If success, increment metrics and delete raw thread
+        // 1. If success, aggregate titles into folder-level master object
         if (insight.status === 'success' && insight.insights) {
-            const pCount = insight.insights.pain_points.length;
-            const tCount = insight.insights.switch_triggers.length;
-            const oCount = insight.insights.desired_outcomes.length;
+            console.log(`[FIRESTORE] Aggregating signals for success ${insight.id}`);
 
-            await folderRef.update({
-                painPointCount: FieldValue.increment(pCount),
-                triggerCount: FieldValue.increment(tCount),
-                outcomeCount: FieldValue.increment(oCount)
+            await db.runTransaction(async (transaction) => {
+                const folderDoc = await transaction.get(folderRef);
+                if (!folderDoc.exists) return;
+
+                const folderData = folderDoc.data() as Folder;
+                const signals = folderData.intelligence_signals || {
+                    allPainPointTitles: [],
+                    allSwitchTriggerTitles: [],
+                    allDesiredOutcomeTitles: []
+                };
+
+                const newPainPoints = insight.insights!.pain_points || [];
+                const newTriggers = insight.insights!.switch_triggers || [];
+                const newOutcomes = insight.insights!.desired_outcomes || [];
+
+                const addedPainPoints: string[] = [];
+                const addedTriggers: string[] = [];
+                const addedOutcomes: string[] = [];
+
+                newPainPoints.forEach(p => {
+                    const title = p.title.trim().toLowerCase();
+                    if (title && !signals.allPainPointTitles.includes(title)) {
+                        signals.allPainPointTitles.push(title);
+                        addedPainPoints.push(title);
+                    }
+                });
+
+                newTriggers.forEach(t => {
+                    const title = t.title.trim().toLowerCase();
+                    if (title && !signals.allSwitchTriggerTitles.includes(title)) {
+                        signals.allSwitchTriggerTitles.push(title);
+                        addedTriggers.push(title);
+                    }
+                });
+
+                newOutcomes.forEach(o => {
+                    const title = o.title.trim().toLowerCase();
+                    if (title && !signals.allDesiredOutcomeTitles.includes(title)) {
+                        signals.allDesiredOutcomeTitles.push(title);
+                        addedOutcomes.push(title);
+                    }
+                });
+
+                transaction.update(folderRef, {
+                    intelligence_signals: signals,
+                    painPointCount: signals.allPainPointTitles.length,
+                    triggerCount: signals.allSwitchTriggerTitles.length,
+                    outcomeCount: signals.allDesiredOutcomeTitles.length
+                });
+
+                // Delete original thread doc once we have structure
+                transaction.delete(threadRef);
             });
 
-            // Delete original thread doc once we have structure
-            await threadRef.delete().catch(() => { });
+            console.log(`[FIRESTORE] Aggregation complete and original thread deleted for ${insight.id}`);
         } else if (insight.status === 'failed') {
             await folderRef.update({
                 failedCount: FieldValue.increment(1)
             });
+            await threadRef.update({
+                analysisStatus: 'failed',
+                analysisTriggeredAt: FieldValue.serverTimestamp()
+            }).catch(() => { });
+        } else if (insight.status === 'processing') {
+            await threadRef.update({
+                analysisStatus: 'processing',
+                analysisTriggeredAt: FieldValue.serverTimestamp()
+            }).catch(() => { });
         }
     } catch (err) {
-        console.error(`[FIRESTORE] Failed to update thread insight ${insight.id}:`, err);
+        console.error(`[FIRESTORE] Failed to update and aggregate thread insight ${insight.id}:`, err);
     }
 }
 
@@ -524,12 +580,17 @@ export async function saveThreadToFolder(uid: string, folderId: string, threadDa
 
     const threadDoc = await threadRef.get();
     const isNew = !threadDoc.exists;
-    await threadRef.set(snapshot);
+    await threadRef.set({
+        ...snapshot,
+        analysisStatus: 'pending' // Default to pending for auto-trigger
+    });
 
     if (isNew) {
         const { FieldValue } = await import("firebase-admin/firestore");
         await folderRef.update({
-            threadCount: FieldValue.increment(1)
+            threadCount: FieldValue.increment(1),
+            totalAnalysisCount: FieldValue.increment(1),
+            pendingAnalysisCount: FieldValue.increment(1)
         });
     }
 }
@@ -548,6 +609,82 @@ export async function getThreadsInFolder(uid: string, folderId: string): Promise
         console.error("Failed to get threads:", err);
         return [];
     }
+}
+
+export async function getFolderIntelligenceSignals(uid: string, folderId: string) {
+    if (!db) throw new Error("Firebase DB not initialized.");
+
+    try {
+        console.log(`[FIRESTORE] [SIGNALS] Fetching signals for folder: ${folderId}`);
+        const signals = {
+            painPoints: [] as any[],
+            triggers: [] as any[],
+            outcomes: [] as any[]
+        };
+
+        let snapshot: any;
+        if (folderId === 'inbox') {
+            // Inbox uses users/{uid}/extractions
+            snapshot = await db.collection("users").doc(uid).collection("extractions").where("isAnalyzed", "==", true).get();
+            console.log(`[FIRESTORE] [SIGNALS] Found ${snapshot.size} analyzed extractions for inbox`);
+        } else {
+            const folderRef = db.collection("folders").doc(folderId);
+            snapshot = await folderRef.collection("completed_threads").get();
+            console.log(`[FIRESTORE] [SIGNALS] Found ${snapshot.size} docs in completed_threads subcollection`);
+        }
+
+        snapshot.docs.forEach((doc: any) => {
+            const data = doc.data();
+            // In extractions, the field is analysisResults. In completed_threads, it's insights
+            const insights = folderId === 'inbox' ? data.analysisResults : data.insights;
+
+            if (!insights) {
+                console.warn(`[FIRESTORE] [SIGNALS] No insights found for doc ${doc.id}`);
+                return;
+            }
+
+            if (insights.pain_points) {
+                insights.pain_points.forEach((p: any) => signals.painPoints.push({ ...p, thread_id: doc.id }));
+            }
+            if (insights.switch_triggers) {
+                insights.switch_triggers.forEach((t: any) => signals.triggers.push({ ...t, thread_id: doc.id }));
+            }
+            if (insights.desired_outcomes) {
+                insights.desired_outcomes.forEach((o: any) => signals.outcomes.push({ ...o, thread_id: doc.id }));
+            }
+        });
+
+        return signals;
+    } catch (err) {
+        console.error("Failed to get folder intelligence signals:", err);
+        throw err;
+    }
+}
+
+export async function saveAggregatedInsights(folderId: string, clusters: any[]) {
+    if (!db) throw new Error("Firebase DB not initialized.");
+    const batch = db.batch();
+    const collectionRef = db.collection("folders").doc(folderId).collection("aggregated_insights");
+
+    // Clear old
+    const old = await collectionRef.get();
+    old.docs.forEach(doc => batch.delete(doc.ref));
+
+    // Save new
+    clusters.forEach((cluster, idx) => {
+        const ref = collectionRef.doc(`cluster_${idx}`);
+        batch.set(ref, {
+            ...cluster,
+            updatedAt: new Date().toISOString()
+        });
+    });
+
+    await batch.commit();
+    console.log(`[FIRESTORE] Saved ${clusters.length} clusters for folder ${folderId}`);
+}
+
+export async function updateUserAicost(uid: string, updates: { totalInputTokens?: number, totalOutputTokens?: number, totalAiCost?: number }) {
+    return updateStats(uid, updates);
 }
 
 // ── Analysis Persistence ───────────────────────────────────────────
@@ -588,7 +725,6 @@ export async function getLatestAnalysis(uid: string, folderId: string): Promise<
     }
     try {
         console.log(`[FIRESTORE] Fetching latest analysis for folder ${folderId}`);
-        // Removed orderBy to avoid requiring a composite index
         const snapshot = await db.collection("folder_analyses")
             .where("uid", "==", uid)
             .where("folderId", "==", folderId)
@@ -599,7 +735,6 @@ export async function getLatestAnalysis(uid: string, folderId: string): Promise<
             return null;
         }
 
-        // Sort in memory (descending by createdAt)
         const docs = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as AnalysisDoc));
         docs.sort((a: AnalysisDoc, b: AnalysisDoc) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
@@ -623,7 +758,6 @@ export async function getFolderAnalyses(uid: string, folderId: string): Promise<
         if (snapshot.empty) return [];
 
         const docs = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as AnalysisDoc));
-        // Sort descending by date
         return docs.sort((a: AnalysisDoc, b: AnalysisDoc) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } catch (err) {
         console.error("Failed to get analyses:", err);
@@ -633,47 +767,35 @@ export async function getFolderAnalyses(uid: string, folderId: string): Promise<
 
 // ── Analytics Logging ──────────────────────────────────────────────
 
-export interface FetchLogEntry {
-    uid: string;
-    email?: string;
-    url: string;
-    plan: string;
-    commentCount: number;
-    timestamp: any; // ServerValue.timestamp
-    status: "success" | "error";
-    error?: string;
-    userAgent?: string;
-}
-
-export async function logFetchEvent(entry: Omit<FetchLogEntry, "timestamp">): Promise<void> {
-    if (!db) throw new Error("Firebase DB not initialized. Cannot log fetch event.");
-
+export async function logFetchEvent(uid: string, type: string, count: number) {
+    if (!db) return;
     try {
-        const { FieldValue } = await import("firebase-admin/firestore");
         await db.collection("fetch_analytics").add({
-            ...entry,
-            timestamp: FieldValue.serverTimestamp(),
+            uid,
+            type,
+            count,
+            timestamp: new Date().toISOString()
         });
     } catch (err) {
         console.error("Failed to log fetch event:", err);
     }
 }
-// ── Extension Extractions ──────────────────────────────────────────
+
+// ── Data Extraction ───────────────────────────────────────────────
 
 export interface ExtractedData {
-    id: string; // generated by extension
+    id: string;
     uid: string;
-    source: 'reddit' | 'g2' | 'manual';
-    url: string;
     title: string;
-    content: any; // Raw platform-specific data
-    post?: any; // Skeleton metadata for listing (hybrid storage)
-    commentCount?: number; // Pre-calculated count (hybrid storage)
-    storageUrl?: string;
+    source: string;
     extractedAt: string;
-    folderId?: string;
+    commentCount: number;
     isAnalyzed: boolean;
     analysisResults?: any;
+    author?: string;
+    subreddit?: string;
+    content?: any;
+    post?: any;
 }
 
 export async function saveExtractedData(uid: string, data: Omit<ExtractedData, "uid">): Promise<void> {
@@ -706,6 +828,9 @@ export interface UserStats {
     hoursSaved: number;
     intelligenceScanned: number;
     commentsAnalyzed: number;
+    totalAiCost?: number;
+    totalInputTokens?: number;
+    totalOutputTokens?: number;
 }
 
 export async function getUserStats(uid: string): Promise<UserStats> {
@@ -727,7 +852,11 @@ export async function updateStats(uid: string, updates: Partial<UserStats>): Pro
 
         const dbUpdates: Record<string, any> = {};
         for (const [key, value] of Object.entries(updates)) {
-            dbUpdates[key] = FieldValue.increment(value as number);
+            if (typeof value === 'number') {
+                dbUpdates[key] = FieldValue.increment(value);
+            } else {
+                dbUpdates[key] = value;
+            }
         }
 
         await ref.set(dbUpdates, { merge: true });

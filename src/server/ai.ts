@@ -1,4 +1,5 @@
-import { VertexAI } from "@google-cloud/vertexai";
+import { VertexAI, SchemaType } from "@google-cloud/vertexai";
+import { GoogleAuth } from "google-auth-library";
 
 const project = process.env.GOOGLE_CLOUD_PROJECT || "redditkeeperprod";
 const location = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
@@ -208,6 +209,22 @@ const granularModel = vertexAI.getGenerativeModel({
     }
 });
 
+const arbitrationModel = vertexAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+            type: SchemaType.OBJECT,
+            properties: {
+                areSame: { type: SchemaType.BOOLEAN },
+                reasoning: { type: SchemaType.STRING },
+                canonicalTitle: { type: SchemaType.STRING }
+            },
+            required: ["areSame", "reasoning", "canonicalTitle"]
+        }
+    }
+});
+
 interface ThreadContext {
     id: string;
     title: string;
@@ -370,6 +387,7 @@ ${threadContent}
     try {
         console.log(`[AI] [GRANULAR] Analyzing thread ${thread.id} via Vertex AI...`);
         const result = await granularModel.generateContent(systemPrompt);
+        console.log('granual result', result)
         const text = result.response.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (!text) throw new Error("No response from Vertex AI");
@@ -378,4 +396,174 @@ ${threadContent}
         console.error(`[AI] [GRANULAR] Error analyzing thread ${thread.id}:`, error);
         throw error;
     }
+}
+
+export async function arbitrateSimilarity(titleA: string, titleB: string) {
+    const prompt = `
+    You are a linguistics expert. Compare two market research insights.
+    Decide if they are "nuances of the same core problem" OR "distinctly different issues".
+    
+    Category Example: Pain Point
+    Title A: "${titleA}"
+    Title B: "${titleB}"
+    
+    Rules:
+    - Return areSame: true if they describe the same underlying user frustration.
+    - provide a brief reasoning.
+    - provide a canonicalTitle that best represents both.
+    
+    Return JSON.
+    `;
+
+    try {
+        const result = await arbitrationModel.generateContent(prompt);
+        const text = result.response.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) throw new Error("No response from Arbitration Model");
+        return {
+            ...JSON.parse(text),
+            usage: result.response.usageMetadata
+        };
+    } catch (error) {
+        console.error("[AI] [ARBITRATION] Error:", error);
+        return { areSame: false, reasoning: "Error in arbitration", canonicalTitle: titleA };
+    }
+}
+
+export async function getEmbeddings(texts: string[]) {
+    try {
+        console.log(`[AI] Generating embeddings for ${texts.length} items...`);
+
+        const auth = new GoogleAuth({
+            scopes: 'https://www.googleapis.com/auth/cloud-platform'
+        });
+        const client = await auth.getClient();
+        const projectId = await auth.getProjectId();
+        const location = 'us-central1';
+        const model = 'text-embedding-004';
+
+        const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:predict`;
+
+        const instances = texts.map(text => ({ content: text }));
+        const response = await client.request({
+            url,
+            method: 'POST',
+            data: { instances }
+        }) as any;
+
+        if (!response.data?.predictions) {
+            throw new Error("No predictions returned from Vertex AI Embeddings");
+        }
+
+        const totalCharacters = texts.reduce((sum, text) => sum + text.length, 0);
+
+        return {
+            embeddings: response.data.predictions.map((p: any) => ({
+                values: p.embeddings.values
+            })),
+            billableCharacters: totalCharacters
+        };
+    } catch (error) {
+        console.error("[AI] [EMBEDDING] Error:", error);
+        throw error;
+    }
+}
+
+// ── Stage 5: Ranked Synthesis ────────────────────────────────────────────────────────
+
+const synthesisSchema = {
+    type: SchemaType.OBJECT,
+    properties: {
+        ranked_build_priorities: {
+            type: SchemaType.ARRAY,
+            items: {
+                type: SchemaType.OBJECT,
+                properties: {
+                    rank: { type: SchemaType.INTEGER },
+                    initiative: { type: SchemaType.STRING },
+                    justification: { type: SchemaType.STRING },
+                    evidence_mentions: { type: SchemaType.INTEGER },
+                    threads_covered: { type: SchemaType.INTEGER }
+                },
+                required: ["rank", "initiative", "justification", "evidence_mentions", "threads_covered"]
+            }
+        },
+        market_attack_summary: { type: SchemaType.STRING },
+        top_switch_triggers: {
+            type: SchemaType.ARRAY,
+            items: { type: SchemaType.STRING }
+        },
+        top_desired_outcomes: {
+            type: SchemaType.ARRAY,
+            items: { type: SchemaType.STRING }
+        },
+        high_intensity_pain_points: {
+            type: SchemaType.ARRAY,
+            items: { type: SchemaType.STRING }
+        },
+        metadata: {
+            type: SchemaType.OBJECT,
+            properties: {
+                total_threads: { type: SchemaType.INTEGER },
+                total_comments: { type: SchemaType.INTEGER },
+                generated_at: { type: SchemaType.STRING }
+            },
+            required: ["total_threads", "total_comments", "generated_at"]
+        }
+    },
+    required: ["ranked_build_priorities", "market_attack_summary", "top_switch_triggers", "top_desired_outcomes", "high_intensity_pain_points", "metadata"]
+};
+
+const synthesisModel = vertexAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: synthesisSchema
+    },
+    systemInstruction: {
+        role: "system",
+        parts: [{
+            text: `You are an expert product strategist. Your task is to perform Stage 5: Ranked Synthesis.
+You will be provided with three arrays of aggregated, clustered signals: pain_points, switch_triggers, and desired_outcomes.
+
+STRICT INSTRUCTIONS:
+1. Rank build priorities from pain_points ONLY.
+2. Extract strongest switching signals from switch_triggers ONLY.
+3. Extract aspiration signals from desired_outcomes ONLY.
+4. NEVER mix categories.
+5. NEVER fabricate counts (mention_count, threads_covered). You must extract numbers STRICTLY from the provided input data blocks. If you reference a cluster, pass through its exact counts.
+6. Provide brief justification referencing frequency and the provided data metrics.
+7. Return empty arrays if there is insufficient evidence for a category.`
+        }]
+    }
+});
+
+export async function synthesizeReport(categories: { painPoints: any[], triggers: any[], outcomes: any[] }, totalThreads: number, totalComments: number) {
+    console.log(`[AI] Starting Stage 5 Ranked Synthesis...`);
+
+    // We only pass the necessary data to the LLM to save tokens and prevent confusion
+    const inputContent = JSON.stringify({
+        pain_points: categories.painPoints.map(p => ({ title: p.canonicalTitle, mention_count: p.mentionCount, threads_covered: p.threadCount, intensity_score: p.intensityScore })),
+        switch_triggers: categories.triggers.map(t => ({ title: t.canonicalTitle, mention_count: t.mentionCount, threads_covered: t.threadCount, intensity_score: t.intensityScore })),
+        desired_outcomes: categories.outcomes.map(o => ({ title: o.canonicalTitle, mention_count: o.mentionCount, threads_covered: o.threadCount, intensity_score: o.intensityScore })),
+        metadata: {
+            total_threads: totalThreads,
+            total_comments: totalComments
+        }
+    });
+
+    const result = await synthesisModel.generateContent({
+        contents: [{ role: 'user', parts: [{ text: inputContent }] }]
+    });
+
+    const response = result.response;
+    if (!response.candidates || response.candidates.length === 0) {
+        throw new Error("No synthesis generated by AI");
+    }
+
+    const jsonString = response.candidates[0].content.parts[0].text || "{}";
+
+    return {
+        parsedResult: JSON.parse(jsonString),
+        usage: response.usageMetadata
+    };
 }

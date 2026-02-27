@@ -24,8 +24,13 @@ build/
 Thumbs.db
 
 # Logs
+logs/
 *.log
 npm-debug.log*
+
+# R&D / Debug
+serper_*.txt
+*_rd_v5_*.txt
 wishlist.md
 chrome-extension/.env.development 
 chrome-extension/.env.production

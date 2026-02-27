@@ -33,7 +33,8 @@ import {
     updateFolderSyncStatus,
     incrementPendingSyncCount,
     updateFolderAnalysisStatus,
-    updateThreadInsight
+    updateThreadInsight,
+    getDb
 } from "./server/firestore.js";
 import { analyzeThreads, analyzeThreadGranular } from "./server/ai.js";
 import { RedditDiscoveryService } from "./server/redditDiscovery.js";
@@ -251,6 +252,27 @@ app.post("/api/folders/:id/threads", authMiddleware, async (req: express.Request
     }
     try {
         await saveThreadToFolder(req.user.uid, req.params.id as string, threadData);
+
+        // Auto-trigger analysis
+        const folderId = req.params.id as string;
+        const folder = await getFolder(req.user.uid, folderId);
+        let analysisRunId = folder?.currentAnalysisRunId;
+        if (!analysisRunId || folder?.analysisStatus !== 'processing') {
+            analysisRunId = `auto_${Date.now()}`;
+            await updateFolderAnalysisStatus(req.user.uid, folderId, 'processing', analysisRunId);
+        }
+
+        const threadId = threadData.id || threadData.post?.id;
+        await granularAnalysisQueue.add("granular-analyze", {
+            threadId,
+            url: threadData.source || threadData.post?.url,
+            folderId,
+            userUid: req.user.uid,
+            title: threadData.title || threadData.post?.title,
+            subreddit: threadData.subreddit || threadData.post?.subreddit,
+            analysisRunId
+        });
+
         res.json({ success: true });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
@@ -281,13 +303,13 @@ app.post("/api/folders/:id/sync", authMiddleware, async (req: express.Request, r
         // 3. Enqueue jobs with Priority based on Plan
         const priority = req.user.plan === 'free' ? 10 : 3;
 
-        for (const url of urls) {
-            await syncQueue.add("sync", {
-                url,
-                folderId,
-                userUid: req.user.uid
-            }, { priority });
-        }
+        const jobs = urls.map(url => ({
+            name: "sync",
+            data: { url, folderId, userUid: req.user!.uid },
+            opts: { priority }
+        }));
+
+        await syncQueue.addBulk(jobs);
 
         res.json({ success: true, count: urls.length });
     } catch (err: any) {
@@ -332,8 +354,71 @@ app.get("/api/folders/:id/threads", async (req: express.Request, res: express.Re
             });
             res.json(threads);
         } else {
-            const threads = await getThreadsInFolder(req.user.uid, req.params.id as string);
-            res.json(threads);
+            const folderId = req.params.id as string;
+            const uid = req.user.uid;
+            const [threads, folder] = await Promise.all([
+                getThreadsInFolder(uid, folderId),
+                getFolder(uid, folderId)
+            ]);
+
+            // AUTO-RECOVERY: Check for stale processing threads (> 5 mins)
+            const STALE_MS = 5 * 60 * 1000;
+            const now = Date.now();
+            const recoveryJobs: any[] = [];
+            const recoveryRunId = folder?.currentAnalysisRunId || `auto_${now}`;
+            for (const thread of threads) {
+                const isStuck = (thread.analysisStatus === 'pending' || thread.analysisStatus === 'processing');
+                const lastActivity = thread.analysisTriggeredAt || thread.savedAt;
+                const triggerTime = lastActivity ? new Date(lastActivity).getTime() : 0;
+
+                if (isStuck && (now - triggerTime > STALE_MS)) {
+                    console.log(`[AutoRecovery] Re-triggering stuck analysis for thread ${thread.id}`);
+
+                    // Pre-emptively mark as processing
+                    await updateThreadInsight(uid, folderId, {
+                        id: thread.id,
+                        folderId,
+                        uid,
+                        threadLink: thread.source,
+                        status: 'processing'
+                    });
+
+                    recoveryJobs.push({
+                        name: "granular-analyze",
+                        data: {
+                            threadId: thread.id,
+                            url: thread.source,
+                            folderId,
+                            userUid: uid,
+                            title: thread.title,
+                            subreddit: thread.subreddit,
+                            analysisRunId: recoveryRunId
+                        }
+                    });
+                }
+            }
+
+            if (recoveryJobs.length > 0) {
+                if (!folder?.currentAnalysisRunId) {
+                    await updateFolderAnalysisStatus(uid, folderId, 'processing', recoveryRunId);
+                }
+                await granularAnalysisQueue.addBulk(recoveryJobs);
+                console.log(`[AutoRecovery] Re-queued ${recoveryJobs.length} stale analysis jobs via Bulk for folder ${folderId}`);
+            }
+
+            res.json({
+                threads,
+                meta: {
+                    painPointCount: folder?.painPointCount || 0,
+                    triggerCount: folder?.triggerCount || 0,
+                    outcomeCount: folder?.outcomeCount || 0,
+                    intelligence_signals: folder?.intelligence_signals,
+                    totalAnalysisCount: folder?.totalAnalysisCount || 0,
+                    completedAnalysisCount: folder?.completedAnalysisCount || 0,
+                    failedCount: folder?.failedCount || 0,
+                    analysisStatus: folder?.analysisStatus
+                }
+            });
         }
     } catch (err: any) {
         res.status(500).json({ error: err.message });
@@ -375,13 +460,6 @@ const analysisQueue = new Queue("analysis", {
 });
 console.log("[INIT] BullMQ Analysis Queue initialized.");
 
-const analysisQueueEvents = new QueueEvents("analysis", {
-    connection: {
-        url: redisUrl
-    }
-});
-console.log("[INIT] BullMQ Queue Events initialized.");
-
 // ── Reddit Sync Queue (BullMQ) ───────────────────────────────────
 
 const syncQueue = new Queue("reddit-sync", {
@@ -418,7 +496,9 @@ const syncWorker = new Worker("reddit-sync", async (job) => {
 
         // 4. Auto-trigger Granular Analysis
         // Ensure folder status is processing so UI shows metrics bar
-        await updateFolderAnalysisStatus(userUid, folderId, 'processing');
+        const folder = await getFolder(userUid, folderId);
+        const analysisRunId = folder?.currentAnalysisRunId || `auto_${Date.now()}`;
+        await updateFolderAnalysisStatus(userUid, folderId, 'processing', analysisRunId);
 
         const finalThreadId = fullData.id || fullData.post?.id;
         if (finalThreadId) {
@@ -428,7 +508,8 @@ const syncWorker = new Worker("reddit-sync", async (job) => {
                 folderId,
                 userUid,
                 title: fullData.title || fullData.post?.title,
-                subreddit: fullData.subreddit || fullData.post?.subreddit
+                subreddit: fullData.subreddit || fullData.post?.subreddit,
+                analysisRunId
             });
         } else {
             console.warn(`[SyncWorker] Could not trigger analysis: No thread ID found for ${url}`);
@@ -446,7 +527,8 @@ const syncWorker = new Worker("reddit-sync", async (job) => {
     limiter: {
         max: 1,
         duration: 1000 // 1 per second
-    }
+    },
+    drainDelay: 10000 // Only poll Redis every 10s if idle to save Upstash quota
 });
 
 syncWorker.on('failed', (job, err) => {
@@ -458,6 +540,15 @@ const granularAnalysisWorker = new Worker("granular-analysis", async (job) => {
     console.log(`[GranularWorker] Analyzing thread: ${threadId} for folder: ${folderId}`);
 
     try {
+        // 0. Update thread status to processing
+        await updateThreadInsight(userUid, folderId, {
+            id: threadId,
+            folderId,
+            uid: userUid,
+            threadLink: url,
+            status: 'processing'
+        });
+
         // 1. Fetch thread from Firestore (SavedThread)
         const threads = await getThreadsInFolder(userUid, folderId);
         const thread = threads.find(t => t.id === threadId);
@@ -475,15 +566,22 @@ const granularAnalysisWorker = new Worker("granular-analysis", async (job) => {
             comments = contentJson.flattenedComments || contentJson.comments || contentJson.reviews || [];
         }
 
-        // 3. Call AI
-        const insights = await analyzeThreadGranular({
+        // 3. Call AI with Timeout protection (2 minutes)
+        const analysisPromise = analyzeThreadGranular({
             id: threadId,
             title: thread.title,
             subreddit: thread.subreddit,
             comments: comments
         });
 
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("AI Analysis timed out after 2 minutes")), 120000)
+        );
+
+        const insights = await Promise.race([analysisPromise, timeoutPromise]) as any;
+
         // 4. Save to Firestore (Helper handles metric increments & thread deletion)
+        console.log(`[GranularWorker] Intelligence extracted for ${threadId}. Saving to Firestore...`);
         await updateThreadInsight(userUid, folderId, {
             id: threadId,
             folderId,
@@ -492,6 +590,10 @@ const granularAnalysisWorker = new Worker("granular-analysis", async (job) => {
             status: 'success',
             insights
         });
+        console.log(`[GranularWorker] Successfully processed and saved ${threadId}`);
+
+        // Pass insights to finally block for siloed storage
+        (job.data as any).completedInsights = insights;
 
     } catch (err: any) {
         console.error(`[GranularWorker] Failed for ${threadId}:`, err.message);
@@ -504,10 +606,57 @@ const granularAnalysisWorker = new Worker("granular-analysis", async (job) => {
             error: err.message
         });
         throw err;
+    } finally {
+        try {
+            const db = getDb();
+            const folderRef = db.collection("folders").doc(folderId);
+            const trackerRef = folderRef.collection("completed_threads").doc(threadId);
+            const { analysisRunId } = job.data;
+
+            await db.runTransaction(async (transaction) => {
+                const folderDoc = await transaction.get(folderRef);
+                if (!folderDoc.exists) return;
+
+                const data = folderDoc.data() || {};
+
+                // Siloing: ONLY accept updates from the CURRENT analysis run accurately.
+                // If the job has no runId or it doesn't match, it's a zombie from a previous incarnation/reset.
+                if (!analysisRunId || data.currentAnalysisRunId !== analysisRunId) {
+                    console.log(`[GranularWorker] Ignoring zombie/untracked job ${threadId} (Job Run: ${analysisRunId}, Folder Run: ${data.currentAnalysisRunId})`);
+                    return;
+                }
+
+                const trackerDoc = await transaction.get(trackerRef);
+                if (trackerDoc.exists) return; // Already counted this thread in THIS run
+
+                const newCompleted = (data.completedAnalysisCount || 0) + 1;
+                const newPending = Math.max(0, (data.pendingAnalysisCount || 0) - 1);
+
+                const update: any = {
+                    completedAnalysisCount: newCompleted,
+                    pendingAnalysisCount: newPending
+                };
+
+                if (newPending <= 0) {
+                    console.log(`[GranularWorker] All threads analyzed for folder ${folderId}. Setting status to idle.`);
+                    update.analysisStatus = 'idle';
+                    update.pendingAnalysisCount = 0;
+                }
+
+                transaction.set(trackerRef, {
+                    completedAt: new Date(),
+                    insights: job.data.completedInsights || null
+                });
+                transaction.update(folderRef, update);
+            });
+        } catch (finalErr) {
+            console.error(`[GranularWorker] Error in finally block for ${threadId}:`, finalErr);
+        }
     }
 }, {
     connection: { url: redisUrl },
-    concurrency: 4 // Parallel processing
+    concurrency: 3, // Balanced for speed and API safety
+    drainDelay: 10000 // Save Upstash quota
 });
 
 // Worker Processor (Analysis)
@@ -563,7 +712,7 @@ const analysisWorker = new Worker("analysis", async (job) => {
         parsedResult.createdAt = new Date().toISOString();
 
         // Save to Firestore (Private usage metadata included)
-        await saveAnalysis(userUid, folderId, parsedResult, "gemini-2.5-flash", usage);
+        await saveAnalysis(userUid, folderId, parsedResult, "gemini-2.0-flash", usage);
 
         // Deduct Credit (Increment Usage)
         // threadCount is also available in job.data as threadCount
@@ -587,7 +736,8 @@ const analysisWorker = new Worker("analysis", async (job) => {
     connection: {
         url: redisUrl
     },
-    concurrency: 5 // Process 5 AI jobs concurrently
+    concurrency: 5, // Process 5 AI jobs concurrently
+    drainDelay: 10000 // Save Upstash quota
 });
 
 analysisWorker.on('completed', (job, returnvalue) => {
@@ -600,6 +750,18 @@ analysisWorker.on('failed', (job, err) => {
 
 // ── API Routes ─────────────────────────────────────────────────────
 
+app.post("/api/folders/:id/status", async (req: express.Request, res: express.Response) => {
+    if (!req.user) return res.status(401).json({ error: "Unauthorized" });
+    try {
+        const { status } = req.body;
+        const folderId = req.params.id as string;
+        await updateFolderAnalysisStatus(req.user.uid, folderId, status);
+        res.json({ success: true });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post("/api/folders/:id/analyze", async (req: express.Request, res: express.Response) => {
     if (!req.user) {
         res.status(401).json({ error: "Unauthorized" });
@@ -608,41 +770,95 @@ app.post("/api/folders/:id/analyze", async (req: express.Request, res: express.R
 
     try {
         const folderId = req.params.id as string;
-        const folder = await getFolder(req.user.uid, folderId);
+        console.log(`[SERVER] [ANALYZE] Triggered for folder: ${folderId} (User: ${req.user.uid})`);
+
+        const folder = folderId === 'inbox'
+            ? { id: 'inbox', name: 'Inbox' }
+            : await getFolder(req.user.uid, folderId);
 
         if (!folder) {
+            console.warn(`[SERVER] [ANALYZE] Folder not found: ${folderId}`);
             res.status(404).json({ error: "Folder not found" });
             return;
         }
 
-        const savedThreads = await getThreadsInFolder(req.user.uid, folderId);
-        if (savedThreads.length === 0) {
-            res.status(400).json({ error: "Folder is empty" });
+        // 1. Fetch all raw insights (Pain Points, Triggers, Outcomes) from completed threads
+        const firestore = await import("./server/firestore.js");
+        const signals = await firestore.getFolderIntelligenceSignals(req.user.uid, folderId);
+        console.log(`[SERVER] [ANALYZE] Retrieved signals - Pain: ${signals.painPoints.length}, Triggers: ${signals.triggers.length}, Outcomes: ${signals.outcomes.length}`);
+
+        const totalSignals = signals.painPoints.length + signals.triggers.length + signals.outcomes.length;
+        if (totalSignals === 0) {
+            res.status(400).json({ error: "No analyzed insights found in this folder. Please analyze some threads first." });
             return;
         }
 
-        console.log(`[API] Triggering granular analysis for folder ${folderId} (${savedThreads.length} threads)`);
+        // 2. Run Clustering Engine
+        const { ClusterEngine } = await import("./server/clustering.js");
+        const engine = new ClusterEngine(folderId, req.user.uid);
 
-        // 1. Initial State
-        await updateFolderAnalysisStatus(req.user.uid, folderId, 'processing');
+        // We run all categories
+        const painPoints = await engine.aggregate(signals.painPoints, "pain_point");
+        const triggers = await engine.aggregate(signals.triggers, "switch_trigger");
+        const outcomes = await engine.aggregate(signals.outcomes, "desired_outcome");
 
-        // 2. Enqueue each thread
-        for (const thread of savedThreads) {
-            await granularAnalysisQueue.add("granular-analyze", {
-                threadId: thread.id,
-                url: thread.source,
-                folderId,
-                userUid: req.user.uid,
-                title: thread.title,
-                subreddit: thread.subreddit
+        // 3. Save aggregated clusters to the subcollection
+        const allClusters = [...painPoints, ...triggers, ...outcomes];
+        await firestore.saveAggregatedInsights(folderId, allClusters);
+
+        // 4. Run Final LLM Synthesis
+        console.log(`[SERVER] [ANALYZE] Running Stage 5 Ranked Synthesis for folder ${folderId}`);
+        const { synthesizeReport } = await import("./server/ai.js");
+
+        const uniqueThreadIds = new Set([
+            ...signals.painPoints.map((s: any) => s.thread_id),
+            ...signals.triggers.map((s: any) => s.thread_id),
+            ...signals.outcomes.map((s: any) => s.thread_id)
+        ]);
+        const totalThreads = uniqueThreadIds.size;
+        const totalComments = (folder as any)?.metrics?.commentsAnalyzed || 0;
+
+        const synthesisResult = await synthesizeReport({ painPoints, triggers, outcomes }, totalThreads, totalComments);
+
+        // Track Synthesis Cost
+        if (synthesisResult.usage) {
+            const inputTokens = synthesisResult.usage.promptTokenCount || 0;
+            const outputTokens = synthesisResult.usage.candidatesTokenCount || 0;
+            const inputCost = (inputTokens / 1000000) * 0.0375;
+            const outputCost = (outputTokens / 1000000) * 0.15;
+            await firestore.updateUserAicost(req.user.uid, {
+                totalInputTokens: inputTokens,
+                totalOutputTokens: outputTokens,
+                totalAiCost: inputCost + outputCost
             });
         }
 
-        res.json({ success: true, count: savedThreads.length });
+        const finalReport = {
+            ...synthesisResult.parsedResult,
+            metadata: {
+                ...synthesisResult.parsedResult.metadata,
+                total_threads: totalThreads,
+                total_comments: totalComments,
+                generated_at: new Date().toISOString()
+            }
+        };
 
+        // 5. Save the final report
+        await firestore.saveAnalysis(req.user.uid, folderId, finalReport, "gemini-2.0-flash", synthesisResult.usage);
+
+        res.json({
+            success: true,
+            folderId,
+            aggregates: {
+                painPoints,
+                triggers,
+                outcomes
+            },
+            synthesis: finalReport
+        });
     } catch (err: any) {
-        console.error("Analysis Error:", err);
-        res.status(500).json({ error: "Analysis failed: " + err.message });
+        console.error("Aggregation Error:", err);
+        res.status(500).json({ error: "Failed to aggregate insights: " + err.message });
     }
 });
 
@@ -1016,3 +1232,39 @@ app.listen(PORT, "0.0.0.0", () => {
     console.log(`   Host: 0.0.0.0 (Required for Cloud Run)`);
     console.log(`   Redis Status: ${redis.status}`);
 });
+
+// ── Graceful Shutdown ──────────────────────────────────────────────
+
+async function gracefulShutdown(signal: string) {
+    console.log(`[SHUTDOWN] Received ${signal}. Closing BullMQ components...`);
+
+    try {
+        // 1. Close Workers first (stop picking up new jobs)
+        await Promise.all([
+            syncWorker.close(),
+            granularAnalysisWorker.close(),
+            analysisWorker.close()
+        ]);
+        console.log("[SHUTDOWN] BullMQ Workers closed.");
+
+        // 2. Close Queues
+        await Promise.all([
+            analysisQueue.close(),
+            syncQueue.close(),
+            granularAnalysisQueue.close()
+        ]);
+        console.log("[SHUTDOWN] BullMQ Queues closed.");
+
+        // 3. Close Redis
+        await redis.quit();
+        console.log("[SHUTDOWN] Redis connection closed.");
+
+        process.exit(0);
+    } catch (err) {
+        console.error("[SHUTDOWN] Error during graceful shutdown:", err);
+        process.exit(1);
+    }
+}
+
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
