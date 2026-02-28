@@ -97,7 +97,7 @@ export const FolderDetail: React.FC = () => {
 
         // 3. Listen to Analysis Results
         const analysisQuery = query(
-            collection(db, 'analyses'),
+            collection(db, 'folder_analyses'),
             where('folderId', '==', folderId)
         );
         const unsubAnalysis = onSnapshot(analysisQuery, (snapshot) => {
