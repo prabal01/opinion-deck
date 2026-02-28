@@ -266,6 +266,84 @@
     color: var(--bg-accent);
 }
 
+/* THREADS LIST VIEW (Table style) */
+.thread-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.thread-list-header {
+    display: grid;
+    grid-template-columns: 3fr 1fr 1fr 3fr;
+    gap: 1rem;
+    padding: 0 1rem 0.5rem 1rem;
+    color: var(--text-tertiary);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: 0.5rem;
+}
+
+.thread-list-row {
+    display: grid;
+    grid-template-columns: 3fr 1fr 1fr 3fr;
+    gap: 1rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-md);
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.thread-list-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    transform: translateX(4px);
+}
+
+.thread-list-cell {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.thread-list-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.thread-list-badges {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+    overflow: hidden;
+}
+
+.pain-point-badge {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
 /* FOLDER LIST (Horizontal Layout) */
 .folders-grid {
     display: grid;

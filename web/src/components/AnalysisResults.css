@@ -366,3 +366,120 @@ h2.strategic-title {
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
+
+/* --- Tabular Dashboard Styles --- */
+.data-table-container {
+    width: 100%;
+    margin-bottom: 24px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.data-table-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 1rem;
+    font-weight: 700;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.9rem;
+}
+
+.data-table th {
+    background: rgba(255, 255, 255, 0.01);
+    padding: 12px 20px;
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.data-table td {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    vertical-align: top;
+    color: var(--text-secondary);
+}
+
+.data-table tr:last-child td {
+    border-bottom: none;
+}
+
+.data-table tr:hover {
+    background: rgba(255, 255, 255, 0.01);
+}
+
+/* Specific column styles */
+.col-rank {
+    width: 60px;
+    text-align: center;
+    font-weight: 900;
+    color: white;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.col-priority {
+    width: 25%;
+    font-weight: 600;
+    color: white;
+}
+
+.col-justification {
+    width: 50%;
+    line-height: 1.5;
+}
+
+.col-evidence {
+    width: 20%;
+}
+
+.signal-bar-mini {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    margin-top: 6px;
+    overflow: hidden;
+}
+
+.signal-bar-mini-fill {
+    height: 100%;
+    background: var(--primary-color);
+    border-radius: 2px;
+}
+
+/* Bullet list table alternatives for high density */
+.dense-list-container {
+    padding: 12px 20px;
+}
+
+.dense-list-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.dense-list-item:last-child {
+    border-bottom: none;
+}
+
+.dense-list-item-icon {
+    margin-top: 2px;
+    flex-shrink: 0;
+}

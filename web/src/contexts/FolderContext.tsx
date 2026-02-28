@@ -24,7 +24,7 @@ interface FolderContextType {
     saveThread: (folderId: string, threadData: any) => Promise<void>;
     getFolderThreads: (folderId: string) => Promise<any[]>;
     analyzeFolder: (folderId: string) => Promise<any>;
-    syncThreads: (folderId: string, urls: string[]) => Promise<void>;
+    syncThreads: (folderId: string, urls: string[], items?: any[]) => Promise<void>;
 }
 
 const FolderContext = createContext<FolderContextType | undefined>(undefined);
@@ -158,7 +158,7 @@ export const FolderProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
     };
 
-    const syncThreads = async (folderId: string, urls: string[]) => {
+    const syncThreads = async (folderId: string, urls: string[], items?: any[]) => {
         if (!user) throw new Error('Not authenticated');
         try {
             const token = await getIdToken();
@@ -168,7 +168,7 @@ export const FolderProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ urls })
+                body: JSON.stringify({ urls, items })
             });
 
             if (!res.ok) throw new Error('Failed to initiate sync');

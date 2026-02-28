@@ -14,6 +14,7 @@ import { Sidebar } from "./components/Sidebar";
 import { ReportsView } from "./components/ReportsView";
 import { SettingsView } from "./components/SettingsView";
 import { ResearchView } from "./components/ResearchView";
+import { DiscoveryLab } from "./components/discovery/LabDiscovery";
 
 import { LoginView } from "./components/LoginView";
 
@@ -168,6 +169,11 @@ function AppContent() {
               <Route path="/folders/:folderId/threads/:threadId" element={
                 <RequireAuth>
                   <FolderDetail />
+                </RequireAuth>
+              } />
+              <Route path="/lab/discovery" element={
+                <RequireAuth>
+                  <DiscoveryLab />
                 </RequireAuth>
               } />
             </Routes>
