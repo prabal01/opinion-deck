@@ -9,10 +9,11 @@ import { Skeleton } from './Skeleton';
 import './Folders.css';
 import './AnalysisResults.css';
 import { fetchFolderAnalysis, aggregateInsights } from '../lib/api';
-import { AlertTriangle, Sparkles, Trash2, BarChart2, Calendar, MessageSquare as MessageSquareIcon, ExternalLink, FileDown, Loader2, Target, Lightbulb, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, Sparkles, Trash2, BarChart2, Calendar, MessageSquare as MessageSquareIcon, ExternalLink, FileDown, Loader2, Target, Lightbulb, ShieldAlert, CheckCircle2, UploadCloud, FileText } from 'lucide-react';
 import { exportReportToPDF } from '../lib/pdfExport';
 import { IntelligenceScanner } from './IntelligenceScanner';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { BulkImportModal } from './BulkImportModal';
+import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 interface SavedThread {
@@ -27,6 +28,7 @@ interface SavedThread {
     storageUrl?: string;
     tokenCount?: number;
     analysisStatus?: 'pending' | 'processing' | 'success' | 'failed';
+    extractedPainPoints?: string[];
 }
 
 interface ThreadInsight {
@@ -59,6 +61,7 @@ export const FolderDetail: React.FC = () => {
     const [realtimeFolder, setRealtimeFolder] = useState<any>(null);
     const [threadInsights] = useState<Record<string, ThreadInsight>>({});
     const [isAggregating, setIsAggregating] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
 
     // Real-time Folder & Insights Listener
     useEffect(() => {
@@ -78,32 +81,41 @@ export const FolderDetail: React.FC = () => {
             }
         });
 
-        // 2. Initial fetch for threads and meta
-        getFolderThreads(folderId).then((data: any) => {
-            if (data.threads) {
-                setThreads(data.threads);
-            } else if (Array.isArray(data)) {
-                setThreads(data);
-            }
-
-            if (data.meta) {
-                setRealtimeFolder((prev: any) => ({ ...prev, ...data.meta }));
-            }
+        // 2. Listen to Threads
+        const threadsQuery = query(
+            collection(db, 'saved_threads'),
+            where('folderId', '==', folderId)
+        );
+        const unsubThreads = onSnapshot(threadsQuery, (snapshot) => {
+            const threadData = snapshot.docs.map(doc => ({
+                ...doc.data(),
+                id: doc.id
+            })) as SavedThread[];
+            setThreads(threadData);
             setLoading(false);
         });
 
-        fetchFolderAnalysis(folderId)
-            .then(data => {
-                if (Array.isArray(data)) {
-                    setAnalyses(data);
-                } else if (data) {
-                    setAnalyses([data]);
-                }
-            })
-            .catch(err => console.error("Failed to load analysis:", err));
+        // 3. Listen to Analysis Results
+        const analysisQuery = query(
+            collection(db, 'analyses'),
+            where('folderId', '==', folderId)
+        );
+        const unsubAnalysis = onSnapshot(analysisQuery, (snapshot) => {
+            const analysisData = snapshot.docs.map(doc => ({
+                ...doc.data(),
+                id: doc.id
+            })).sort((a: any, b: any) => {
+                const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                return dateB - dateA;
+            });
+            setAnalyses(analysisData);
+        });
 
         return () => {
             unsubFolder();
+            unsubThreads();
+            unsubAnalysis();
         };
     }, [folderId, getFolderThreads]);
 
@@ -258,8 +270,8 @@ export const FolderDetail: React.FC = () => {
                 boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
             }}>
                 {metrics.map((m, i) => (
-                    <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>
+                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>
                             <div style={{ color: m.color }}>{m.icon}</div>
                             <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{m.label}</span>
                         </div>
@@ -377,25 +389,45 @@ export const FolderDetail: React.FC = () => {
                         )
                     )}
 
-                    {/* Temporary Test Aggregation Button */}
                     <button
                         className="btn-secondary"
+                        onClick={() => setShowImportModal(true)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: 'rgba(255,255,255,0.05)',
+                            padding: '10px 16px',
+                            borderRadius: '14px',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            color: 'white',
+                            fontWeight: 600
+                        }}
+                    >
+                        <UploadCloud size={16} />
+                        Bulk Import
+                    </button>
+
+                    {/* Generate Report Button */}
+                    <button
+                        className="btn-primary"
                         onClick={handleTestAggregation}
                         disabled={isAggregating || isAnalyzing}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            background: 'rgba(16, 185, 129, 0.1)',
-                            border: '1px solid rgba(16, 185, 129, 0.2)',
-                            color: '#10b981',
-                            fontWeight: 600,
-                            padding: '10px 16px',
-                            borderRadius: '12px'
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            border: 'none',
+                            color: 'white',
+                            fontWeight: 700,
+                            padding: '10px 20px',
+                            borderRadius: '14px',
+                            boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
                         }}
                     >
-                        {isAggregating ? <Loader2 className="animate-spin" size={16} /> : <BarChart2 size={16} />}
-                        Test Aggregation
+                        {isAggregating ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
+                        Get Report
                     </button>
 
                     {isAnalyzing && (
@@ -469,7 +501,7 @@ export const FolderDetail: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Sparkles size={14} color="var(--primary-color)" />
                         <span style={{ fontWeight: '700', color: 'white' }}>
-                            {Math.max(threads.length + Object.keys(threadInsights).length, (folder as any).totalAnalysisCount || 0)}
+                            {(realtimeFolder || folder as any).totalAnalysisCount || threads.length}
                         </span>
                         <span style={{ color: 'var(--text-muted)' }}>Platforms Scanned</span>
                     </div>
@@ -494,85 +526,156 @@ export const FolderDetail: React.FC = () => {
 
             <IntelligenceScanner isAnalyzing={isAnalyzing} />
 
-            {analyses.length > 0 && (
-                <div className="analysis-feed">
-                    {analyses.map((analysis, index) => (
-                        <div key={analysis.id || index} className="analysis-wrapper">
-                            <details className="report-collapsible" open={index === 0}>
-                                <summary className="report-summary">
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <BarChart2 size={18} color="var(--primary-color)" /> AI Intelligence Report
-                                        {analysis.createdAt && (
-                                            <span style={{ fontSize: '0.8rem', fontWeight: 400, opacity: 0.8 }}>
-                                                — {new Date(analysis.createdAt).toLocaleString()}
-                                            </span>
-                                        )}
-                                        {index === 0 && <span className="badge-new" style={{ fontSize: '0.7rem', background: 'var(--bg-accent)', color: 'white', padding: '2px 8px', borderRadius: '10px' }}>LATEST</span>}
-                                    </span>
-                                    <span className="report-hint" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                        <button className="btn-icon" onClick={(e) => { e.preventDefault(); e.stopPropagation(); exportReportToPDF(analysis); }} title="Download PDF" style={{ padding: '4px', borderRadius: '6px', background: 'rgba(255, 69, 0, 0.1)', border: '1px solid rgba(255, 69, 0, 0.2)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <FileDown size={16} />
-                                        </button>
-                                        {index === 0 ? "(Expanded)" : "(Click to view history)"}
-                                    </span>
-                                </summary>
-                                <div className="report-content">
-                                    <AnalysisResults data={analysis} onCitationClick={handleCitationClick} />
-                                </div>
-                            </details>
-                        </div>
-                    ))}
-                </div>
-            )}
+            {analyses.length > 0 && (() => {
+                const latestReport = analyses[0];
+                const pastReports = analyses.slice(1);
 
-            <div className="threads-list" style={{ marginTop: '2rem' }}>
+                return (
+                    <div className="analysis-reports-section" style={{ marginTop: '2rem' }}>
+                        <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'white', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <FileText size={24} color="var(--primary-color)" />
+                            Latest AI Report
+                        </h3>
+                        <div className="latest-report-card" style={{ background: 'var(--bg-secondary)', borderRadius: '16px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <div style={{ background: 'var(--primary-color)', color: 'white', fontSize: '0.75rem', fontWeight: 800, padding: '4px 8px', borderRadius: '6px' }}>LATEST</div>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                                        Generated {latestReport.createdAt ? new Date(latestReport.createdAt).toLocaleString() : 'Recently'}
+                                    </span>
+                                </div>
+                                <button className="btn-secondary" onClick={() => exportReportToPDF(latestReport)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '0.85rem' }}>
+                                    <FileDown size={14} /> Download PDF
+                                </button>
+                            </div>
+                            <div style={{ padding: '24px' }}>
+                                <AnalysisResults data={latestReport} onCitationClick={handleCitationClick} />
+                            </div>
+                        </div>
+
+                        {pastReports.length > 0 && (
+                            <div className="past-reports-section" style={{ marginTop: '3rem' }}>
+                                <h4 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '1rem' }}>Previous Reports</h4>
+                                <div className="past-reports-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    {pastReports.map((analysis, index) => (
+                                        <details key={analysis.id || index} className="report-collapsible" style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <summary className="report-summary" style={{ padding: '16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 600, color: 'white' }}>
+                                                    <Calendar size={16} color="var(--text-muted)" />
+                                                    Report from {analysis.createdAt ? new Date(analysis.createdAt).toLocaleString() : 'Unknown Date'}
+                                                </span>
+                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Click to view details</span>
+                                            </summary>
+                                            <div style={{ padding: '24px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+                                                    <button className="btn-secondary" onClick={() => exportReportToPDF(analysis)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '0.85rem' }}>
+                                                        <FileDown size={14} /> Download PDF
+                                                    </button>
+                                                </div>
+                                                <AnalysisResults data={analysis} onCitationClick={handleCitationClick} />
+                                            </div>
+                                        </details>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
+
+            <div className="thread-list-container" style={{ marginTop: '2rem' }}>
+                <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>Saved Threads</h3>
+                <div className="thread-list-header">
+                    <div>Thread / Source</div>
+                    <div>Saved Date</div>
+                    <div>Status</div>
+                    <div>Key Pain Points</div>
+                </div>
                 {threads
                     .sort((a, b) => {
-                        const dateA = new Date((a as any).savedAt || 0).getTime();
-                        const dateB = new Date((b as any).savedAt || 0).getTime();
+                        const dateA = new Date(a.savedAt || 0).getTime();
+                        const dateB = new Date(b.savedAt || 0).getTime();
                         return dateB - dateA;
                     })
                     .map(item => {
-                        const status = (item as any).analysisStatus || (isAnalyzing ? 'processing' : 'pending');
+                        const status = item.analysisStatus || (isAnalyzing ? 'processing' : 'pending');
+                        const painPoints = item.extractedPainPoints || [];
 
                         return (
-                            <div key={item.id} className={`thread-card ${status}`} onClick={() => handleSelectThread(item)} style={{ padding: '20px', position: 'relative' }}>
-                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                                    <div style={{ color: status === 'success' ? '#10b981' : 'var(--primary-color)', marginTop: '4px' }}>
-                                        {status === 'success' ? <CheckCircle2 size={20} /> : <MessageSquareIcon size={20} />}
+                            <div key={item.id} className="thread-list-row" onClick={() => handleSelectThread(item)}>
+                                <div className="thread-list-cell">
+                                    <div className="thread-list-title" title={item.title || 'Extracted Insight'}>
+                                        {item.title || 'Extracted Insight'}
                                     </div>
-                                    <div style={{ flex: 1 }}>
-                                        <h3 className="thread-title" style={{ margin: '0 0 4px 0', fontSize: '1.1rem', opacity: status === 'success' ? 0.7 : 1 }}>
-                                            {(item as any).title || 'Extracted Insight'}
-                                        </h3>
-                                        <div className="thread-meta" style={{ display: 'flex', gap: '16px', opacity: 0.8, fontSize: '0.85rem' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <ExternalLink size={14} color="var(--bg-accent)" />
-                                                <span>{(item as any).subreddit || 'r/extracted'}</span>
-                                            </div>
-                                            {status && (
-                                                <div style={{
-                                                    marginLeft: 'auto',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '6px',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: 800,
-                                                    textTransform: 'uppercase',
-                                                    color: status === 'processing' ? '#3b82f6' :
-                                                        status === 'success' ? '#10b981' : '#ef4444'
-                                                }}>
-                                                    {status === 'processing' && <Loader2 size={12} className="animate-spin" />}
-                                                    {status}
-                                                </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', marginTop: '4px', opacity: 0.6 }}>
+                                        <ExternalLink size={12} />
+                                        <span>{item.subreddit || 'Unknown Source'}</span>
+                                        {item.commentCount !== undefined && (
+                                            <>
+                                                <span style={{ margin: '0 4px', opacity: 0.5 }}>•</span>
+                                                <MessageSquareIcon size={12} />
+                                                <span>{item.commentCount} comments</span>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="thread-list-cell">
+                                    {item.savedAt ? new Date(item.savedAt).toLocaleDateString() : '—'}
+                                </div>
+                                <div className="thread-list-cell">
+                                    <div style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 800,
+                                        textTransform: 'uppercase',
+                                        padding: '4px 8px',
+                                        borderRadius: '6px',
+                                        background: status === 'processing' ? 'rgba(59, 130, 246, 0.1)' :
+                                            status === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                        color: status === 'processing' ? '#3b82f6' :
+                                            status === 'success' ? '#10b981' : '#ef4444'
+                                    }}>
+                                        {status === 'success' ? <CheckCircle2 size={12} /> :
+                                            status === 'processing' ? <Loader2 size={12} className="animate-spin" /> :
+                                                status === 'pending' ? <MessageSquareIcon size={12} /> :
+                                                    <AlertTriangle size={12} />}
+                                        {status}
+                                    </div>
+                                </div>
+                                <div className="thread-list-cell">
+                                    {painPoints.length > 0 ? (
+                                        <div className="thread-list-badges">
+                                            {painPoints.slice(0, 2).map((pp, i) => (
+                                                <span key={i} className="pain-point-badge" title={pp}>{pp}</span>
+                                            ))}
+                                            {painPoints.length > 2 && (
+                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', alignSelf: 'center' }}>
+                                                    +{painPoints.length - 2} more
+                                                </span>
                                             )}
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <span style={{ opacity: 0.5, fontSize: '0.8rem' }}>
+                                            {status === 'success' ? 'None found' : 'Waiting analysis...'}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         );
                     })}
             </div>
+
+            {showImportModal && folderId && (
+                <BulkImportModal
+                    folderId={folderId}
+                    onClose={() => setShowImportModal(false)}
+                    onSuccess={(count) => {
+                        console.log(`Successfully started import of ${count} URLs`);
+                    }}
+                />
+            )}
         </div>
     );
 };
