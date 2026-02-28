@@ -26,6 +26,7 @@ import {
     createFolder,
     deleteFolder,
     saveThreadToFolder,
+    createPlaceholderThread,
     getThreadsInFolder,
     saveAnalysis,
     getLatestAnalysis, getFolderAnalyses,
@@ -37,11 +38,10 @@ import {
     getDb
 } from "./server/firestore.js";
 import { analyzeThreads, analyzeThreadGranular } from "./server/ai.js";
-import { RedditDiscoveryService } from "./server/redditDiscovery.js";
-
-// ── Init ───────────────────────────────────────────────────────────
-
 const app = express();
+import { DiscoveryOrchestrator } from './server/discovery/orchestrator.js';
+
+const discoveryOrchestrator = new DiscoveryOrchestrator();
 const PORT = parseInt(process.env.PORT || "3001", 10);
 const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 const TOOL_VERSION = "1.0.1";
@@ -284,34 +284,44 @@ app.post("/api/folders/:id/sync", authMiddleware, async (req: express.Request, r
         res.status(401).json({ error: "Unauthorized" });
         return;
     }
-    const { urls } = req.body;
+    const { urls, items } = req.body;
     const folderId = req.params.id as string;
 
-    if (!Array.isArray(urls) || urls.length === 0) {
-        res.status(400).json({ error: "Invalid URLs provided" });
+    // Support either a simple string array (URLs) or rich objects (Items)
+    const hasUrls = Array.isArray(urls) && urls.length > 0;
+    const hasItems = Array.isArray(items) && items.length > 0;
+
+    if (!hasUrls && !hasItems) {
+        res.status(400).json({ error: "Invalid URLs or Items provided" });
         return;
     }
 
+    const payloadList = hasItems ? items : urls.map((url: string) => ({ url }));
+
     try {
-        console.log(`[SyncAPI] Initiating sync for folder ${folderId} with ${urls.length} threads.`);
+        console.log(`[SyncAPI] Initiating sync for folder ${folderId} with ${payloadList.length} threads.`);
         // 1. Set folder status to syncing
         await updateFolderSyncStatus(req.user.uid, folderId, 'syncing');
 
-        // 2. Increment pending count
-        await incrementPendingSyncCount(req.user.uid, folderId, urls.length);
+        // 2. Increment pending count & Create Placeholders
+        await incrementPendingSyncCount(req.user.uid, folderId, payloadList.length);
+
+        await Promise.all(payloadList.map((item: any) =>
+            createPlaceholderThread(req.user!.uid, folderId, item.url, item)
+        ));
 
         // 3. Enqueue jobs with Priority based on Plan
         const priority = req.user.plan === 'free' ? 10 : 3;
 
-        const jobs = urls.map(url => ({
+        const jobs = payloadList.map((item: any) => ({
             name: "sync",
-            data: { url, folderId, userUid: req.user!.uid },
+            data: { url: item.url, folderId, userUid: req.user!.uid },
             opts: { priority }
         }));
 
         await syncQueue.addBulk(jobs);
 
-        res.json({ success: true, count: urls.length });
+        res.json({ success: true, count: payloadList.length });
     } catch (err: any) {
         console.error(`[SyncAPI] Failed to initiate sync for folder ${folderId}:`, err);
         res.status(500).json({ error: err.message });
@@ -488,8 +498,11 @@ const syncWorker = new Worker("reddit-sync", async (job) => {
     console.log(`[SyncWorker] Processing thread: ${url} for folder: ${folderId}`);
 
     try {
-        const fullData = await RedditDiscoveryService.fetchFullThreadRecord(url, 500);
-        if (!fullData) throw new Error("Failed to fetch thread data from Reddit");
+        // Detect source platform
+        const source: 'reddit' | 'hn' = url.includes('news.ycombinator.com') ? 'hn' : 'reddit';
+        const fullData = await discoveryOrchestrator.fetchFullThread(url, source);
+
+        if (!fullData) throw new Error(`Failed to fetch thread data from ${source.toUpperCase()}`);
 
         const savedThread = await saveThreadToFolder(userUid, folderId, fullData);
         console.log(`[SyncWorker] Successfully synced thread: ${url}`);
@@ -833,8 +846,52 @@ app.post("/api/folders/:id/analyze", async (req: express.Request, res: express.R
             });
         }
 
+        // 5. Zero-Hallucination Quote Injection
+        // We map the LLM summary titles back to the raw clusters to extract a genuine verbatim quote.
+        const injectContext = (llmTitles: string[] | undefined, clusters: any[]) => {
+            if (!llmTitles) return [];
+            return llmTitles.map(title => {
+                const matchedCluster = clusters.find(c => c.canonicalTitle === title);
+                // Extract just the first valid quote to keep the UI clean
+                let quote = "";
+                if (matchedCluster && matchedCluster.rawInsights && matchedCluster.rawInsights.length > 0) {
+                    const firstInsight = matchedCluster.rawInsights.find((i: any) => i.quotes && i.quotes.length > 0);
+                    if (firstInsight) {
+                        quote = firstInsight.quotes[0];
+                    }
+                }
+                return {
+                    title: title,
+                    context_quote: quote
+                };
+            });
+        };
+
+        const injectPriorityContext = (priorities: any[] | undefined, clusters: any[]) => {
+            if (!priorities) return [];
+            return priorities.map(p => {
+                // Priorities are mapped from pain points, so we look up the initiative title
+                const matchedCluster = clusters.find(c => c.canonicalTitle === p.initiative);
+                let quote = "";
+                if (matchedCluster && matchedCluster.rawInsights && matchedCluster.rawInsights.length > 0) {
+                    const firstInsight = matchedCluster.rawInsights.find((i: any) => i.quotes && i.quotes.length > 0);
+                    if (firstInsight) {
+                        quote = firstInsight.quotes[0];
+                    }
+                }
+                return {
+                    ...p,
+                    context_quote: quote
+                };
+            });
+        };
+
         const finalReport = {
             ...synthesisResult.parsedResult,
+            ranked_build_priorities: injectPriorityContext(synthesisResult.parsedResult.ranked_build_priorities, painPoints),
+            high_intensity_pain_points: injectContext(synthesisResult.parsedResult.high_intensity_pain_points, painPoints),
+            top_switch_triggers: injectContext(synthesisResult.parsedResult.top_switch_triggers, triggers),
+            top_desired_outcomes: injectContext(synthesisResult.parsedResult.top_desired_outcomes, outcomes),
             metadata: {
                 ...synthesisResult.parsedResult.metadata,
                 total_threads: totalThreads,
@@ -881,26 +938,20 @@ function redactAnalysis(data: any): any {
     // 1. Redact High-Intensity Pain Points
     if (data.high_intensity_pain_points) {
         redacted.high_intensity_pain_points = data.high_intensity_pain_points.map((p: any) => ({
-            ...p,
             title: "Locked Pain Point",
-            why_it_matters: "Unlock the Pro plan to see full details of this high-intensity pain point.",
-            representative_quotes: ["Locked quote..."],
-            isLocked: true
+            context_quote: "Unlock the Pro plan to see full details of this high-intensity pain point."
         }));
     }
 
     // 2. Redact Switch Triggers
     if (data.switch_triggers) {
         redacted.switch_triggers = data.switch_triggers.map((s: any) => ({
-            ...s,
-            trigger: "Locked Trigger",
-            strategic_implication: "This switching trigger is available on the Pro plan.",
-            representative_quotes: ["Locked..."],
-            isLocked: true
+            title: "Locked Switch Trigger",
+            context_quote: "This switching trigger is available on the Pro plan."
         }));
     }
 
-    // 3. Redact Feature Gaps
+    // 3. Redact Feature Gaps (Unchanged from original logic for now)
     if (data.feature_gaps) {
         redacted.feature_gaps = data.feature_gaps.map((f: any) => ({
             ...f,
@@ -1116,78 +1167,44 @@ app.post("/api/extractions", async (req: express.Request, res: express.Response)
     }
 });
 
+app.post("/api/discovery/compare", authMiddleware, async (req: express.Request, res: express.Response) => {
+    const { query } = req.body;
+    if (!query) return res.status(400).json({ error: "Query is required" });
+
+    try {
+        console.log(`[Discovery] [LAB] Starting comparison for: ${query}`);
+
+        // Run Baseline (Always skip cache in Lab for testing)
+        const baseline = await discoveryOrchestrator.search(query, 'all', false, true);
+
+        // Run AI-Brain (Always skip cache in Lab for testing)
+        const enhanced = await discoveryOrchestrator.search(query, 'all', true, true);
+
+        res.json({
+            baseline: baseline.results,
+            enhanced: enhanced.results
+        });
+    } catch (err: any) {
+        console.error(`[Discovery] Lab error:`, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post("/api/discovery/search", authMiddleware, async (req: express.Request, res: express.Response) => {
-    const { query, deepDiscovery } = req.body;
+    const { query, platform = 'all' } = req.body;
     if (!query) {
         return res.status(400).json({ error: "Query is required" });
     }
 
     try {
-        console.log(`[Discovery] Starting search for: ${query} (Deep: ${deepDiscovery})`);
-        let results: any[] = [];
-        let discoveryPlan: any = null;
+        console.log(`[Discovery] Starting search for: ${query} (Platform: ${platform})`);
 
-        if (deepDiscovery) {
-            const discoveryData = await RedditDiscoveryService.deepDiscovery(query);
-            results = discoveryData.results;
-
-            const cachedCount = results.filter((r: any) => r.isCached).length;
-            discoveryPlan = {
-                scannedCount: discoveryData.scannedCount || results.length,
-                totalFound: results.length,
-                cachedCount,
-                newCount: results.length - cachedCount,
-                estimatedSyncTime: (results.length - cachedCount) * 1.5,
-                isFromCache: discoveryData.isFromCache,
-                recommendedPath: results.slice(0, 5).map((r: any) => r.title)
-            };
-        } else {
-            const SERPER_API_KEY = process.env.SERPER_API_KEY;
-            if (!SERPER_API_KEY) {
-                console.error("[Discovery] SERPER_API_KEY missing in environment");
-                return res.status(500).json({ error: "Serper API key not configured" });
-            }
-
-            console.log(`[Discovery] [API_CALL] Fetching Serper results for: ${query}`);
-            const serperResponse = await fetch("https://google.serper.dev/search", {
-                method: "POST",
-                headers: {
-                    "X-API-KEY": SERPER_API_KEY,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    q: `site:reddit.com ${query}`,
-                    num: 20,
-                    gl: "us",
-                    hl: "en"
-                })
-            });
-
-            const data: any = await serperResponse.json();
-            const rawResults = (data.organic || []).map((r: any) => ({
-                id: r.link,
-                title: r.title,
-                url: r.link,
-                subreddit: r.link.includes('/r/') ? r.link.split('/r/')[1].split('/')[0] : 'r/unknown',
-                ups: 0,
-                num_comments: 0
-            }));
-
-            // Check cache status for Serper results
-            results = await RedditDiscoveryService.checkMetadataCacheStatus(rawResults);
-            const cachedCount = results.filter((r: any) => r.isCached).length;
-            discoveryPlan = {
-                scannedCount: results.length * 3, // Serper usually scans more than it shows
-                totalFound: results.length,
-                cachedCount,
-                newCount: results.length - cachedCount,
-                estimatedSyncTime: (results.length - cachedCount) * 1.5
-            };
-        }
+        const platforms: ('reddit' | 'hn')[] | 'all' = platform === 'all' ? 'all' : [platform as 'reddit' | 'hn'];
+        const { results, discoveryPlan } = await discoveryOrchestrator.search(query, platforms);
 
         res.json({ results, discoveryPlan });
     } catch (err: any) {
-        console.error("[Discovery] Error:", err);
+        console.error(`[Discovery] Search error:`, err);
         res.status(500).json({ error: err.message });
     }
 });

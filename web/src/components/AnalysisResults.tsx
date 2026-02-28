@@ -9,6 +9,12 @@ interface RankedBuildPriority {
     justification: string;
     evidence_mentions: number;
     threads_covered: number;
+    context_quote?: string;
+}
+
+interface ContextInsight {
+    title: string;
+    context_quote?: string;
 }
 
 interface AnalysisData {
@@ -17,9 +23,9 @@ interface AnalysisData {
     isLocked?: boolean;
     market_attack_summary?: string;
     ranked_build_priorities?: RankedBuildPriority[];
-    high_intensity_pain_points?: string[];
-    top_switch_triggers?: string[];
-    top_desired_outcomes?: string[];
+    high_intensity_pain_points?: ContextInsight[];
+    top_switch_triggers?: ContextInsight[];
+    top_desired_outcomes?: ContextInsight[];
     metadata?: {
         total_threads: number;
         total_comments: number;
@@ -61,18 +67,20 @@ export const AnalysisResults: React.FC<{ data: AnalysisData; onCitationClick?: (
             data.market_attack_summary,
             ``,
             `## Ranked Build Priorities`,
-            ...(data.ranked_build_priorities || []).map(p =>
-                `**#${p.rank} ${p.initiative}**\n${p.justification}\n(${p.evidence_mentions} mentions, ${p.threads_covered} threads)`
-            ),
+            ...(data.ranked_build_priorities || []).map(p => {
+                let text = `**#${p.rank} ${p.initiative}**\n${p.justification}\n(${p.evidence_mentions} mentions, ${p.threads_covered} threads)`;
+                if (p.context_quote) text += `\n  > "${p.context_quote}"`;
+                return text;
+            }),
             ``,
             `## High-Intensity Pain Points`,
-            ...(data.high_intensity_pain_points || []).map(p => `- ${p}`),
+            ...(data.high_intensity_pain_points || []).map(p => `- ${p.title}\n  "${p.context_quote || 'No context'}"`),
             ``,
             `## Top Switch Triggers`,
-            ...(data.top_switch_triggers || []).map(t => `- ${t}`),
+            ...(data.top_switch_triggers || []).map(t => `- ${t.title}\n  "${t.context_quote || 'No context'}"`),
             ``,
             `## Top Desired Outcomes`,
-            ...(data.top_desired_outcomes || []).map(o => `- ${o}`),
+            ...(data.top_desired_outcomes || []).map(o => `- ${o.title}\n  "${o.context_quote || 'No context'}"`),
         ];
         const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
         const a = document.createElement('a');
@@ -136,78 +144,134 @@ export const AnalysisResults: React.FC<{ data: AnalysisData; onCitationClick?: (
                 </div>
             )}
 
-            {/* Dashboard Grid */}
-            <div className="dashboard-grid">
+            {/* Dashboard Container (Vertical Stack) */}
+            <div className="dashboard-vertical-stack">
 
-                {/* Left: Ranked Build Roadmap */}
-                <div className="dashboard-main-column">
-                    <div className="dashboard-card">
-                        <div className="dashboard-card-accent build"><Lightbulb size={15} /> Ranked Build Roadmap</div>
-                        <div className="roadmap-grid">
-                            {(data.ranked_build_priorities || []).map((bp, i) => {
-                                const pct = Math.min(100, ((bp.evidence_mentions || 0) / 15) * 100);
-                                return (
-                                    <div key={i} className="roadmap-card">
-                                        <div className="roadmap-header-row">
-                                            <div className="rank-num">#{bp.rank}</div>
-                                            <div style={{ flex: 1 }}>
-                                                <h4>{bp.initiative}</h4>
-                                                <p>{bp.justification}</p>
-                                                <div className="signal-bar-container">
-                                                    <div className="signal-bar-fill" style={{ width: `${pct}%` }} />
+                {/* 1. Ranked Build Priorities (Rich Table) */}
+                {(data.ranked_build_priorities && data.ranked_build_priorities.length > 0) && (
+                    <div className="data-table-container">
+                        <div className="data-table-header" style={{ borderBottom: '2px solid rgba(255, 69, 0, 0.5)' }}>
+                            <div style={{ background: '#FF4500', color: 'white', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Lightbulb size={14} /> RANKED BUILD ROADMAP
+                            </div>
+                        </div>
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th className="col-rank">RANK</th>
+                                    <th className="col-priority">INITIATIVE</th>
+                                    <th className="col-justification">JUSTIFICATION</th>
+                                    <th className="col-evidence">EVIDENCE SIGNAL</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.ranked_build_priorities.map((bp, i) => {
+                                    const pct = Math.min(100, ((bp.evidence_mentions || 0) / 15) * 100);
+                                    return (
+                                        <tr key={i}>
+                                            <td className="col-rank">#{bp.rank}</td>
+                                            <td className="col-priority">
+                                                <div style={{ fontWeight: 600 }}>{bp.initiative}</div>
+                                                {bp.context_quote && (
+                                                    <div style={{ marginTop: '8px', fontSize: '0.82rem', color: 'var(--text-tertiary)', fontStyle: 'italic', lineHeight: '1.4' }}>
+                                                        "{bp.context_quote}"
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="col-justification">{bp.justification}</td>
+                                            <td className="col-evidence">
+                                                <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{bp.evidence_mentions} Mentions</div>
+                                                <div style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', marginTop: '4px' }}>Across {bp.threads_covered} Threads</div>
+                                                <div className="signal-bar-mini">
+                                                    <div className="signal-bar-mini-fill" style={{ width: `${pct}%` }} />
                                                 </div>
-                                                <div className="signal-meta">
-                                                    <span>Signal Strength</span>
-                                                    <span>{bp.evidence_mentions} Mentions / {bp.threads_covered} Threads</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* 2. High-Intensity Pain Points (Dense List) */}
+                {(data.high_intensity_pain_points && data.high_intensity_pain_points.length > 0) && (
+                    <div className="data-table-container">
+                        <div className="data-table-header" style={{ borderBottom: '2px solid rgba(239, 68, 68, 0.5)' }}>
+                            <div style={{ background: '#ef4444', color: 'white', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Bug size={14} /> HIGH-INTENSITY PAIN POINTS
+                            </div>
+                        </div>
+                        <div className="dense-list-container">
+                            {data.high_intensity_pain_points.map((pp, i) => (
+                                <div key={i} className="dense-list-item" style={{ flexDirection: 'column', gap: '6px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                        <div className="dense-list-item-icon" style={{ color: '#ef4444' }}>•</div>
+                                        <div style={{ fontWeight: 600 }}>{pp.title}</div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Right: Sidebar */}
-                <div className="dashboard-sidebar">
-
-                    {/* Pain Points */}
-                    <div className="dashboard-card">
-                        <div className="dashboard-card-accent attack"><Bug size={15} /> High-Intensity Pain Points</div>
-                        <div className="pain-list-sidebar">
-                            {(data.high_intensity_pain_points || []).map((pp, i) => (
-                                <div key={i} className="pain-item-compact">
-                                    <h4>{pp}</h4>
+                                    {pp.context_quote && (
+                                        <div style={{ paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text-tertiary)', fontStyle: 'italic', lineHeight: '1.4' }}>
+                                            "{pp.context_quote}"
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
                     </div>
+                )}
 
-                    {/* Switch Triggers */}
-                    <div className="dashboard-card">
-                        <div className="dashboard-card-accent exit"><Fingerprint size={15} /> Top Switch Triggers</div>
-                        <div>
-                            {(data.top_switch_triggers || []).map((st, i) => (
-                                <div key={i} className="trigger-item-compact">{st}</div>
-                            ))}
+                {/* 3. Top Switch Triggers (Dense List) */}
+                {(data.top_switch_triggers && data.top_switch_triggers.length > 0) && (
+                    <div className="data-table-container">
+                        <div className="data-table-header" style={{ borderBottom: '2px solid rgba(99, 102, 241, 0.5)' }}>
+                            <div style={{ background: '#6366f1', color: 'white', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Fingerprint size={14} /> TOP SWITCH TRIGGERS
+                            </div>
                         </div>
-                    </div>
-
-                    {/* Desired Outcomes */}
-                    <div className="dashboard-card">
-                        <div className="dashboard-card-accent priority"><CheckCircle2 size={15} /> Top Desired Outcomes</div>
-                        <div className="pain-list-sidebar">
-                            {(data.top_desired_outcomes || []).map((o, i) => (
-                                <div key={i} className="outcome-item-compact">
-                                    <CheckCircle2 size={16} color="#10b981" style={{ flexShrink: 0 }} />
-                                    <span>{o}</span>
+                        <div className="dense-list-container">
+                            {data.top_switch_triggers.map((st, i) => (
+                                <div key={i} className="dense-list-item" style={{ flexDirection: 'column', gap: '6px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                        <div className="dense-list-item-icon" style={{ color: '#6366f1' }}>•</div>
+                                        <div style={{ fontWeight: 600 }}>{st.title}</div>
+                                    </div>
+                                    {st.context_quote && (
+                                        <div style={{ paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text-tertiary)', fontStyle: 'italic', lineHeight: '1.4' }}>
+                                            "{st.context_quote}"
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
                     </div>
+                )}
 
-                </div>
+                {/* 4. Top Desired Outcomes (Dense List) */}
+                {(data.top_desired_outcomes && data.top_desired_outcomes.length > 0) && (
+                    <div className="data-table-container">
+                        <div className="data-table-header" style={{ borderBottom: '2px solid rgba(16, 185, 129, 0.5)' }}>
+                            <div style={{ background: '#10b981', color: 'white', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <CheckCircle2 size={14} /> TOP DESIRED OUTCOMES
+                            </div>
+                        </div>
+                        <div className="dense-list-container">
+                            {data.top_desired_outcomes.map((o, i) => (
+                                <div key={i} className="dense-list-item" style={{ flexDirection: 'column', gap: '6px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                        <CheckCircle2 size={16} color="#10b981" className="dense-list-item-icon" />
+                                        <div style={{ fontWeight: 600 }}>{o.title}</div>
+                                    </div>
+                                    {o.context_quote && (
+                                        <div style={{ paddingLeft: '24px', fontSize: '0.85rem', color: 'var(--text-tertiary)', fontStyle: 'italic', lineHeight: '1.4' }}>
+                                            "{o.context_quote}"
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
             </div>
 
             <div className="analysis-footer">
