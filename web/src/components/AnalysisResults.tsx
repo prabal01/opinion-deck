@@ -23,9 +23,9 @@ interface AnalysisData {
     isLocked?: boolean;
     market_attack_summary?: string;
     ranked_build_priorities?: RankedBuildPriority[];
-    high_intensity_pain_points?: ContextInsight[];
-    top_switch_triggers?: ContextInsight[];
-    top_desired_outcomes?: ContextInsight[];
+    high_intensity_pain_points?: (string | ContextInsight)[];
+    top_switch_triggers?: (string | ContextInsight)[];
+    top_desired_outcomes?: (string | ContextInsight)[];
     metadata?: {
         total_threads: number;
         total_comments: number;
@@ -74,13 +74,13 @@ export const AnalysisResults: React.FC<{ data: AnalysisData; onCitationClick?: (
             }),
             ``,
             `## High-Intensity Pain Points`,
-            ...(data.high_intensity_pain_points || []).map(p => `- ${p.title}\n  "${p.context_quote || 'No context'}"`),
+            ...(data.high_intensity_pain_points || []).map(p => typeof p === 'string' ? `- ${p}` : `- ${p.title}\n  > "${p.context_quote || 'No context'}"`),
             ``,
             `## Top Switch Triggers`,
-            ...(data.top_switch_triggers || []).map(t => `- ${t.title}\n  "${t.context_quote || 'No context'}"`),
+            ...(data.top_switch_triggers || []).map(t => typeof t === 'string' ? `- ${t}` : `- ${t.title}\n  > "${t.context_quote || 'No context'}"`),
             ``,
             `## Top Desired Outcomes`,
-            ...(data.top_desired_outcomes || []).map(o => `- ${o.title}\n  "${o.context_quote || 'No context'}"`),
+            ...(data.top_desired_outcomes || []).map(o => typeof o === 'string' ? `- ${o}` : `- ${o.title}\n  > "${o.context_quote || 'No context'}"`),
         ];
         const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
         const a = document.createElement('a');
@@ -207,9 +207,9 @@ export const AnalysisResults: React.FC<{ data: AnalysisData; onCitationClick?: (
                                 <div key={i} className="dense-list-item" style={{ flexDirection: 'column', gap: '6px' }}>
                                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                                         <div className="dense-list-item-icon" style={{ color: '#ef4444' }}>•</div>
-                                        <div style={{ fontWeight: 600 }}>{pp.title}</div>
+                                        <div style={{ fontWeight: 600 }}>{typeof pp === 'string' ? pp : pp.title}</div>
                                     </div>
-                                    {pp.context_quote && (
+                                    {typeof pp !== 'string' && pp.context_quote && (
                                         <div style={{ paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text-tertiary)', fontStyle: 'italic', lineHeight: '1.4' }}>
                                             "{pp.context_quote}"
                                         </div>
@@ -233,9 +233,9 @@ export const AnalysisResults: React.FC<{ data: AnalysisData; onCitationClick?: (
                                 <div key={i} className="dense-list-item" style={{ flexDirection: 'column', gap: '6px' }}>
                                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                                         <div className="dense-list-item-icon" style={{ color: '#6366f1' }}>•</div>
-                                        <div style={{ fontWeight: 600 }}>{st.title}</div>
+                                        <div style={{ fontWeight: 600 }}>{typeof st === 'string' ? st : st.title}</div>
                                     </div>
-                                    {st.context_quote && (
+                                    {typeof st !== 'string' && st.context_quote && (
                                         <div style={{ paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text-tertiary)', fontStyle: 'italic', lineHeight: '1.4' }}>
                                             "{st.context_quote}"
                                         </div>
@@ -259,9 +259,9 @@ export const AnalysisResults: React.FC<{ data: AnalysisData; onCitationClick?: (
                                 <div key={i} className="dense-list-item" style={{ flexDirection: 'column', gap: '6px' }}>
                                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                                         <CheckCircle2 size={16} color="#10b981" className="dense-list-item-icon" />
-                                        <div style={{ fontWeight: 600 }}>{o.title}</div>
+                                        <div style={{ fontWeight: 600 }}>{typeof o === 'string' ? o : o.title}</div>
                                     </div>
-                                    {o.context_quote && (
+                                    {typeof o !== 'string' && o.context_quote && (
                                         <div style={{ paddingLeft: '24px', fontSize: '0.85rem', color: 'var(--text-tertiary)', fontStyle: 'italic', lineHeight: '1.4' }}>
                                             "{o.context_quote}"
                                         </div>
