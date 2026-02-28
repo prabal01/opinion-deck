@@ -21,6 +21,7 @@ export const exportReportToPDF = (data: any) => {
     doc.setTextColor(0, 0, 0);
     doc.text("Strategic Directive", 14, 45);
 
+    let currentY = 58;
     if (typeof data.market_attack_summary === 'string') {
         doc.setFont("helvetica", "bold");
         doc.text("Attack Plan:", 14, 52);

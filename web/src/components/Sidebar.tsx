@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { BRANDING } from '../constants/branding';
-import { LayoutDashboard, Folder, RefreshCw, Settings, Globe, Search, Loader2 } from 'lucide-react';
+import { LayoutDashboard, RefreshCw, Settings, Globe, Search, Loader2, FlaskConical } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 export const Sidebar: React.FC = () => {
@@ -66,6 +66,18 @@ export const Sidebar: React.FC = () => {
                 <NavLink to="/reports" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
                     <RefreshCw size={18} /> <span className="link-text">Analytics</span>
                 </NavLink>
+                <div className="sidebar-divider" style={{
+                    height: '1px',
+                    background: 'rgba(255,255,255,0.05)',
+                    margin: '10px 20px'
+                }} />
+
+                <NavLink
+                    to="/lab/discovery"
+                    className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+                >
+                    <FlaskConical size={18} /> <span className="link-text">Discovery Lab</span>
+                </NavLink>
             </nav>
 
             <div className="sidebar-footer">
@@ -108,15 +120,15 @@ export const Sidebar: React.FC = () => {
                         {plan === 'pro'
                             ? `${Math.max(0, 50 - (userStats?.reportsGenerated || 0))} / 50`
                             : `${Math.max(0, 5 - (userStats?.reportsGenerated || 0))} / 5`}
-                    </div>
-                </div>
+                    </div >
+                </div >
                 <NavLink to="/settings" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'} style={{ padding: '8px 0' }}>
                     <Settings size={18} /> <span className="link-text">Settings</span>
                 </NavLink>
                 <a href={BRANDING.LANDING_PAGE_URL} className="nav-link" style={{ padding: '8px 0', opacity: 0.7 }}>
                     <Globe size={18} /> <span className="link-text">Back to Home</span>
                 </a>
-            </div>
-        </aside>
+            </div >
+        </aside >
     );
 };

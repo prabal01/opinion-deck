@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Brain, Zap, Search, BarChart2, Info, Mail } from 'lucide-react';
+import { Sparkles, Brain, Zap, Search, BarChart2, Mail } from 'lucide-react';
 import './IntelligenceScanner.css';
 
 interface IntelligenceScannerProps {
