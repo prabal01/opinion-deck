@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { API_BASE } from '../../../lib/api';
 export interface DiscoveryResult {
     id: string;
     title: string;
@@ -44,7 +45,7 @@ export const useDiscovery = () => {
 
         try {
             const token = await getIdToken();
-            const response = await fetch('/api/discovery/search', {
+            const response = await fetch(`${API_BASE}/discovery/search`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
